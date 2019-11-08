@@ -1,0 +1,10 @@
+chapter UTxO
+
+session UTxO(ledgerformalization) = HOL +
+  description \<open>Formalization of the UTxO transition system\<close>
+  sessions
+    "HOL-Library"
+  theories
+    UTxO
+  document_files
+    "root.tex"
