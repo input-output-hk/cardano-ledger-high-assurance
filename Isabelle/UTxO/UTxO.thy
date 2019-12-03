@@ -589,7 +589,7 @@ proof -
   have "balance ?utxo' = (\<Sum>txin\<^sub>i \<in> (fmdom' utxo \<union> {txin}). snd (?utxo' $$! txin\<^sub>i))"
     by simp
   also from assms have "\<dots> = (\<Sum>txin\<^sub>i \<in> fmdom' utxo. snd (?utxo' $$! txin\<^sub>i)) + snd (?utxo' $$! txin)"
-    by (simp add: fmdom'.rep_eq)
+    by simp
   also have "\<dots> = (\<Sum>txin\<^sub>i \<in> fmdom' utxo. snd (?utxo' $$! txin\<^sub>i)) + snd txout"
     by simp
   also from assms have "\<dots> = (\<Sum>txin\<^sub>i \<in> fmdom' utxo. snd (utxo $$! txin\<^sub>i)) + snd txout"
@@ -720,7 +720,7 @@ next
         by (auto simp add: rev_finite_subset)
     qed
     moreover have "finite (fmdom' utxo\<^sub>2)"
-      by (simp add: fmdom'.rep_eq)
+      by simp
     ultimately show ?thesis
       using fmupd.IH by fastforce
   qed
