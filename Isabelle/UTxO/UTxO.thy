@@ -7,17 +7,17 @@ begin
 (* TODO: Move to a separate theory for reuse. *)
 text \<open> Some extra lemmas and syntactic sugar for \<open>fmap\<close> \<close>
 
-abbreviation fmap_update ("_'(_ $$:= _')" [1000,0,0] 1000) where
+abbreviation fmap_update (\<open>_'(_ $$:= _')\<close> [1000,0,0] 1000) where
   "fmap_update m k v \<equiv> fmupd k v m"
 
-notation fmlookup (infixl "$$" 999)
+notation fmlookup (infixl \<open>$$\<close> 999)
 
-notation fmempty ("{$$}")
+notation fmempty (\<open>{$$}\<close>)
 
-abbreviation fmap_singleton ("{_ $$:= _}" [0, 0] 1000) where
+abbreviation fmap_singleton (\<open>{_ $$:= _}\<close> [0, 0] 1000) where
   "fmap_singleton k v \<equiv> {$$}(k $$:= v)"
 
-abbreviation fmap_lookup_the (infixl "$$!" 999) where
+abbreviation fmap_lookup_the (infixl \<open>$$!\<close> 999) where
   "fmap_lookup_the m k \<equiv> the (m $$ k)"
 
 lemma fmfilter_fmsubset: "fmfilter p m \<subseteq>\<^sub>f m"
@@ -31,10 +31,10 @@ qed
 (* TODO: Move to a separate theory for reuse. *)
 text \<open> Non-standard map operators \<close>
 
-abbreviation dom_res :: "'a set \<Rightarrow> ('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap" (infixl "\<lhd>" 150) where
+abbreviation dom_res :: "'a set \<Rightarrow> ('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap" (infixl \<open>\<lhd>\<close> 150) where
   "s \<lhd> m \<equiv> fmfilter (\<lambda>x. x \<in> s) m"
 
-abbreviation dom_exc :: "'a set \<Rightarrow> ('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap" (infixl "\<lhd>'/" 150) where
+abbreviation dom_exc :: "'a set \<Rightarrow> ('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap" (infixl \<open>\<lhd>'/\<close> 150) where
   "s \<lhd>/ m \<equiv> fmfilter (\<lambda>x. x \<notin> s) m"
 
 lemma dom_res_not_in_absorb:
@@ -119,7 +119,7 @@ lemma dom_exc_fmupd:
   by (smt Diff_iff Diff_insert_absorb domIff fmfilter_cong fmfilter_upd option.simps(3))
 
 abbreviation
-  fmsub :: "('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap" (infixl "--\<^sub>f" 100) where
+  fmsub :: "('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap" (infixl \<open>--\<^sub>f\<close> 100) where
   "m\<^sub>1 --\<^sub>f m\<^sub>2 \<equiv> fmfilter (\<lambda>x. x \<notin> fmdom' m\<^sub>2) m\<^sub>1"
 
 lemma fmsub_fmadd_distr: "m\<^sub>1 --\<^sub>f (m\<^sub>2 ++\<^sub>f m\<^sub>3) = m\<^sub>1 --\<^sub>f m\<^sub>2 --\<^sub>f m\<^sub>3"
@@ -245,7 +245,7 @@ type_synonym utxo_state = "utxo \<times> lovelace"
 text \<open> UTxO inference rules \<close>
 
 inductive utxo_sts :: "utxo_env \<Rightarrow> utxo_state \<Rightarrow> tx \<Rightarrow> utxo_state \<Rightarrow> bool"
-  ("_ \<turnstile> _ \<rightarrow>\<^bsub>UTXO\<^esub>{_} _" [51, 0, 51] 50)
+  (\<open>_ \<turnstile> _ \<rightarrow>\<^bsub>UTXO\<^esub>{_} _\<close> [51, 0, 51] 50)
   for \<Gamma>
   where
     utxo_inductive: "
@@ -262,7 +262,7 @@ inductive utxo_sts :: "utxo_env \<Rightarrow> utxo_state \<Rightarrow> tx \<Righ
 text \<open> Transaction sequences \<close>
 
 inductive utxows :: "utxo_env \<Rightarrow> utxo_state \<Rightarrow> tx list \<Rightarrow> utxo_state \<Rightarrow> bool"
-  ("_ \<turnstile> _ \<rightarrow>\<^bsub>UTXOWS\<^esub>{_} _" [51, 0, 51] 50)
+  (\<open>_ \<turnstile> _ \<rightarrow>\<^bsub>UTXOWS\<^esub>{_} _\<close> [51, 0, 51] 50)
   for \<Gamma>
   where
     empty: "\<Gamma> \<turnstile> s \<rightarrow>\<^bsub>UTXOWS\<^esub>{[]} s" |
@@ -491,7 +491,7 @@ primrec general_append :: "['a \<Rightarrow> ('b, 'c) fmap, 'a list] \<Rightarro
   "general_append f (x # xs) = f x ++\<^sub>f general_append f xs"
 
 syntax
-  "_general_append" :: "pttrn => 'a list => 'b \<rightharpoonup> 'c => 'b \<rightharpoonup> 'c" ("(3\<Oplus>_\<leftarrow>_. _)" [0, 0, 100] 100)
+  "_general_append" :: "pttrn => 'a list => 'b \<rightharpoonup> 'c => 'b \<rightharpoonup> 'c" (\<open>(3\<Oplus>_\<leftarrow>_. _)\<close> [0, 0, 100] 100)
 translations
   "\<Oplus>x\<leftarrow>xs. p" \<rightleftharpoons> "CONST general_append (\<lambda>x. p) xs"
 
