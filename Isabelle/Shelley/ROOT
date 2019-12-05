@@ -1,0 +1,8 @@
+chapter LedgerFormalization
+
+session Shelley (ledgerformalization) = HOL +
+  description \<open>Shelley Release\<close>
+  sessions
+    "HOL-Library"
+  document_files
+    "root.tex"
