@@ -4,5 +4,15 @@ session Shelley (ledgerformalization) = HOL +
   description \<open>Shelley Release\<close>
   sessions
     "HOL-Library"
+  theories
+    Address
+    Basic_Types
+    Cryptography
+    Delegation
+    Finite_Map_Extras
+    Protocol_Parameters
+    Transaction
+    Update
+    UTxO
   document_files
     "root.tex"
