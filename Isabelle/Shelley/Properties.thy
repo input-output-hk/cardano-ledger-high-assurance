@@ -114,8 +114,11 @@ lemma utxo_value_preservation:
 proof -
   from assms show ?thesis
   proof cases
-    case (utxo_inductive utxo pp stk_creds stpools refunded decayed deposit_change ups' ups slot gen_delegs deps fees)
-    from utxo_inductive(3) have "val_utxo_state s' =
+    case (utxo_inductive utxo pp stk_creds stpools refunded decayed deposit_change ups' ups slot
+      gen_delegs deps fees)
+    from \<open>s' =
+      (txins tx \<lhd>/ utxo ++\<^sub>f outs tx, deps + deposit_change, fees + txfee tx + decayed, ups')\<close>
+    have "val_utxo_state s' =
       val_utxo_state (
         (txins tx \<lhd>/ utxo) ++\<^sub>f outs tx,
         deps + deposit_change,
@@ -139,7 +142,8 @@ proof -
         by simp
       also have "\<dots> = val_map (fmmap snd (txins tx \<lhd>/ utxo)) + val_map (fmmap snd (outs tx))"
       proof -
-        from utxo_inductive(4) have "fmdom'(txins tx \<lhd>/ utxo) \<inter> fmdom' (outs tx) = {}"
+        from \<open>txid tx \<notin> {tid | tid ix. (tid, ix) \<in> fmdom' utxo}\<close>
+        have "fmdom'(txins tx \<lhd>/ utxo) \<inter> fmdom' (outs tx) = {}"
           using txins_outs_exc by blast
         then show ?thesis
           using val_map_union by (smt fmdom'_map sum.cong)
@@ -149,7 +153,8 @@ proof -
       finally show ?thesis
         by linarith
     qed
-    also from utxo_inductive(11) have "\<dots> =
+    also from \<open>deposit_change = deposits pp stpools (txcerts tx) - (refunded + decayed)\<close>
+    have "\<dots> =
       ubalance (txins tx \<lhd>/ utxo) + ubalance (outs tx)
       + (deps + deposits pp stpools (txcerts tx) - (refunded + decayed))
       + (fees + txfee tx + decayed)"
@@ -159,12 +164,12 @@ proof -
       + deps + deposits pp stpools (txcerts tx) - refunded
       + fees + txfee tx"
       by simp
-    also from utxo_inductive(9) have "\<dots> =
+    also from \<open>refunded = decayed_tx pp stk_creds tx\<close> have "\<dots> =
       ubalance (txins tx \<lhd>/ utxo) + ubalance (outs tx)
       + deps + deposits pp stpools (txcerts tx) - key_refunds pp stk_creds tx
       + fees + txfee tx"
       by simp
-    also from utxo_inductive(7) have "\<dots> =
+    also from \<open>consumed pp utxo stk_creds tx = produced pp stpools tx\<close> have "\<dots> =
       ubalance (txins tx \<lhd>/ utxo) + ubalance (txins tx \<lhd> utxo)
       + wbalance (txwdrls tx) + key_refunds pp stk_creds tx
       + deps - key_refunds pp stk_creds tx + fees"
@@ -181,13 +186,13 @@ proof -
       also have "\<dots> =
         val_map (txins tx \<lhd>/ (fmmap snd utxo)) + val_map (txins tx \<lhd> (fmmap snd utxo))"
         by simp
-      also from utxo_inductive(6) have "\<dots> = val_map (fmmap snd utxo)"
+      also from \<open>txins tx \<subseteq> fmdom' utxo\<close> have "\<dots> = val_map (fmmap snd utxo)"
         using val_map_split by (metis fmdom'_map)
       finally show ?thesis
         using val_utxo_val_map by simp
     qed
     finally show ?thesis
-      using utxo_inductive(2) by simp
+      using \<open>s = (utxo, deps, fees, ups)\<close> by simp
   qed
 qed
 
