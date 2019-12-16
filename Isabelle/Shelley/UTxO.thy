@@ -32,6 +32,39 @@ text \<open> Tx outputs as UTxO \<close>
 abbreviation outs :: "tx \<Rightarrow> utxo" where
   "outs tx \<equiv> fmap_of_list [((txid tx, ix), txout). (ix, txout) \<leftarrow> sorted_list_of_fmap (txouts tx)]"
 
+lemma dom_outs_is_txid:
+  assumes "(i, ix) \<in> fmdom' (outs tx)"
+  shows "i = txid tx"
+proof -
+  from assms have "(i, ix) \<in> fset (fmdom (
+    fmap_of_list [((txid tx, ix), txout). (ix, txout) \<leftarrow> sorted_list_of_fmap (txouts tx)]))"
+    by (simp add: fmdom'_alt_def)
+  then have "(i, ix) \<in> fset (fset_of_list (
+    map fst [((txid tx, ix), txout). (ix, txout) \<leftarrow> sorted_list_of_fmap (txouts tx)]))"
+    by simp
+  then have "(i, ix) \<in> fset (fset_of_list
+    [(txid tx, ix). (ix, txout) \<leftarrow> sorted_list_of_fmap (txouts tx)])"
+    by auto
+  then have "(i, ix) \<in> set [(txid tx, ix). (ix, txout) \<leftarrow> sorted_list_of_fmap (txouts tx)]"
+    by (simp add: fset_of_list.rep_eq)
+  then show "i = txid tx"
+    by auto
+qed
+
+lemma txins_outs_exc:
+  assumes "txid tx \<notin> {tid | tid ix. (tid, ix) \<in> fmdom' utxo}"
+  shows "fmdom' (txins tx \<lhd>/ utxo) \<inter> fmdom' (outs tx) = {}"
+proof -
+  from assms have "txid tx \<notin> {tid | tid ix. (tid, ix) \<in> fmdom' (txins tx \<lhd>/ utxo)}"
+    by simp
+  then have "\<And>txin. txin \<in> fmdom' (txins tx \<lhd>/ utxo) \<Longrightarrow> fst txin \<noteq> txid tx"
+    by (smt mem_Collect_eq prod.collapse)
+  moreover have "\<And>txin. txin \<in> fmdom' (outs tx) \<Longrightarrow> fst txin = txid tx"
+    using dom_outs_is_txid by (metis prod.collapse)
+  ultimately show ?thesis
+    by blast
+qed
+
 text \<open> UTxO balance \<close>
 
 abbreviation ubalance :: "utxo \<Rightarrow> coin" where
@@ -65,14 +98,18 @@ type_synonym utxo_state = "utxo \<times> coin \<times> coin \<times> update_stat
 
 text \<open> UTxO inference rules \<close>
 
-(* NOTE: `ups'` is not defined for now since it involves another transition system. *)
+text \<open>
+  NOTE:
+  \<^item> The assumption that the Tx ID must not appear in utxo needs to be made explicit here (see
+    first precondition).
+  \<^item> \<open>ups'\<close> is not defined for now since it involves another transition system.
+\<close>
 inductive utxo_sts :: "utxo_env \<Rightarrow> utxo_state \<Rightarrow> tx \<Rightarrow> utxo_state \<Rightarrow> bool"
   (\<open>_ \<turnstile> _ \<rightarrow>\<^bsub>UTXO\<^esub>{_} _\<close> [51, 0, 51] 50)
   where
     utxo_inductive: "
       \<lbrakk>
-        \<Gamma> = (slot, pp, stk_creds, stpools, gen_delegs);
-        s = (utxo, deps, fees, ups);
+        txid tx \<notin> {tid | tid ix. (tid, ix) \<in> fmdom' utxo};
         txins tx \<noteq> {};
         txins tx \<subseteq> fmdom' utxo;
         consumed pp utxo stk_creds tx = produced pp stpools tx;
@@ -80,41 +117,17 @@ inductive utxo_sts :: "utxo_env \<Rightarrow> utxo_state \<Rightarrow> tx \<Righ
         refunded = key_refunds pp stk_creds tx;
         decayed = decayed_tx pp stk_creds tx;
         deposit_change = deposits pp stpools (txcerts tx) - (refunded + decayed);
-        ups' = ups; \<comment> \<open>FIXME: Complete later\<close>
-        finite (fmdom' utxo)
+        ups' = ups \<comment> \<open>TODO: Continue later\<close>
       \<rbrakk>
       \<Longrightarrow>
-      \<Gamma> \<turnstile> s \<rightarrow>\<^bsub>UTXO\<^esub>{tx} (
-        (txins tx \<lhd>/ utxo) ++\<^sub>f outs tx, deps + deposit_change, fees + txfee tx + decayed, ups')"
-
-subsection \<open> Properties \<close>
-
-subsubsection \<open> Preservation of Value \<close>
-
-text \<open> Lovelace Value \<close>
-
-abbreviation val_coin :: "coin \<Rightarrow> coin" where
-  "val_coin c \<equiv> c"
-
-abbreviation val_map :: "('a, coin) fmap \<Rightarrow> coin" where
-  "val_map m \<equiv> (\<Sum>k \<in> fmdom' m. m $$! k)"
-
-fun val_utxo_state :: "utxo_state \<Rightarrow> coin" where
-  "val_utxo_state (utxo, deps, fees, ups) = ubalance utxo + deps + fees"
-
-lemma val_map_split:
-  assumes "s \<subseteq> fmdom' m"
-  shows "val_map m = val_map (s \<lhd>/ m) + val_map (s \<lhd> m)"
-  oops
-
-lemma val_map_union:
-  assumes "fmdom' m\<^sub>1 \<inter> fmdom' m\<^sub>2 = {}"
-  shows "val_map (m\<^sub>1 ++\<^sub>f m\<^sub>2) = val_map m\<^sub>1 + val_map m\<^sub>2"
-  oops
-
-lemma utxo_value_preservation:
-  assumes "\<Gamma> \<turnstile> s \<rightarrow>\<^bsub>UTXO\<^esub>{t} s'"
-  shows "val_utxo_state s + wbalance (txwdrls t) = val_utxo_state s'"
-  oops
+      (slot, pp, stk_creds, stpools, gen_delegs)
+        \<turnstile> (utxo, deps, fees, ups)
+          \<rightarrow>\<^bsub>UTXO\<^esub>{tx}
+          (
+            (txins tx \<lhd>/ utxo) ++\<^sub>f outs tx,
+            deps + deposit_change,
+            fees + txfee tx + decayed,
+            ups'
+          )"
 
 end

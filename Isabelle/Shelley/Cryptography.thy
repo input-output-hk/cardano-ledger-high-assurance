@@ -1,4 +1,4 @@
-section \<open> Cryptographic primitives \<close>
+section \<open> Cryptographic Primitives \<close>
 
 theory Cryptography
   imports Main
