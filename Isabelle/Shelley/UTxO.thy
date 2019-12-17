@@ -108,18 +108,6 @@ inductive utxo_sts :: "utxo_env \<Rightarrow> utxo_state \<Rightarrow> tx \<Righ
   (\<open>_ \<turnstile> _ \<rightarrow>\<^bsub>UTXO\<^esub>{_} _\<close> [51, 0, 51] 50)
   where
     utxo_inductive: "
-      \<lbrakk>
-        txid tx \<notin> {tid | tid ix. (tid, ix) \<in> fmdom' utxo};
-        txins tx \<noteq> {};
-        txins tx \<subseteq> fmdom' utxo;
-        consumed pp utxo stk_creds tx = produced pp stpools tx;
-        \<forall>(_, c) \<in> fmran' (txouts tx). c \<ge> 0;
-        refunded = key_refunds pp stk_creds tx;
-        decayed = decayed_tx pp stk_creds tx;
-        deposit_change = deposits pp stpools (txcerts tx) - (refunded + decayed);
-        ups' = ups \<comment> \<open>TODO: Continue later\<close>
-      \<rbrakk>
-      \<Longrightarrow>
       (slot, pp, stk_creds, stpools, gen_delegs)
         \<turnstile> (utxo, deps, fees, ups)
           \<rightarrow>\<^bsub>UTXO\<^esub>{tx}
@@ -129,5 +117,14 @@ inductive utxo_sts :: "utxo_env \<Rightarrow> utxo_state \<Rightarrow> tx \<Righ
             fees + txfee tx + decayed,
             ups'
           )"
+      if "txid tx \<notin> {tid | tid ix. (tid, ix) \<in> fmdom' utxo}"
+      and "txins tx \<noteq> {}"
+      and "txins tx \<subseteq> fmdom' utxo"
+      and "consumed pp utxo stk_creds tx = produced pp stpools tx"
+      and "\<forall>(_, c) \<in> fmran' (txouts tx). c \<ge> 0"
+      and "refunded = key_refunds pp stk_creds tx"
+      and "decayed = decayed_tx pp stk_creds tx"
+      and "deposit_change = deposits pp stpools (txcerts tx) - (refunded + decayed)"
+      and "ups' = ups" \<comment> \<open>TODO: Continue later\<close>
 
 end
