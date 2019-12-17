@@ -74,9 +74,6 @@ next
   finally show ?case .
 qed
 
-text \<open>
-  NOTE: The precondition \<open>s \<subseteq> fmdom' m\<close> stated in the document is not really needed.
-\<close>
 lemma val_map_split:
   shows "val_map m = val_map (s \<lhd>/ m) + val_map (s \<lhd> m)"
 proof -
@@ -106,7 +103,6 @@ text \<open>
     \<open>(addr, coin)\<close>.
   \<^item> The proof in the document applies lemma 15.4 without proving its
     precondition, which is not trivial to formalize.
-  \<^item> This formalization does not rely on Theorem 15.10 (the proof in the document does).
 \<close>
 lemma utxo_value_preservation:
   assumes "\<Gamma> \<turnstile> s \<rightarrow>\<^bsub>UTXO\<^esub>{tx} s'"
