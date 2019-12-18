@@ -50,4 +50,8 @@ text \<open> Absolute slot \<close>
 
 typedecl slot
 
+text \<open> Application versions \<close>
+
+typedecl applications \<comment> \<open>NOTE: Abstract for now\<close>
+
 end

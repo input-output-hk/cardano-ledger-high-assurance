@@ -4,10 +4,6 @@ theory Transaction
   imports Basic_Types Address Finite_Map_Extras Delegation Update
 begin
 
-text \<open> Genesis key hash \<close>
-
-typedecl key_hash_g
-
 text \<open> Transaction ID \<close>
 
 typedecl tx_id
@@ -23,10 +19,6 @@ type_synonym tx_out = "addr \<times> coin"
 text \<open> Reward withdrawal \<close>
 
 type_synonym wdrl = "(addr_rwd, coin) fmap"
-
-text \<open> Update proposal \<close>
-
-typedecl update \<comment> \<open>NOTE: Abstract for now\<close>
 
 text \<open> Transaction body \<close>
 
@@ -66,6 +58,11 @@ fun txfee :: "tx \<Rightarrow> coin" where
 
 fun txwdrls :: "tx \<Rightarrow> wdrl" where
   "txwdrls ((_, _, _, _, _, wds, _), _) = wds"
+
+\<comment> \<open>Protocol parameter update\<close>
+
+fun txup :: "tx \<Rightarrow> update" where
+  "txup ((_, _, _, _, _, _, upd), _) = upd"
 
 text \<open> Abstract functions \<close>
 

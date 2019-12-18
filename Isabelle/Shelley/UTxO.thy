@@ -1,7 +1,7 @@
 section \<open> UTxO \<close>
 
 theory UTxO
-  imports Transaction Finite_Map_Extras Protocol_Parameters Cryptography
+  imports Transaction Finite_Map_Extras Protocol_Parameters Cryptography Update
 begin
 
 subsection \<open> Deposits and Refunds \<close>
@@ -102,7 +102,6 @@ text \<open>
   NOTE:
   \<^item> The assumption that the Tx ID must not appear in utxo needs to be made explicit here (see
     first precondition).
-  \<^item> \<open>ups'\<close> is not defined for now since it involves another transition system.
 \<close>
 inductive utxo_sts :: "utxo_env \<Rightarrow> utxo_state \<Rightarrow> tx \<Rightarrow> utxo_state \<Rightarrow> bool"
   (\<open>_ \<turnstile> _ \<rightarrow>\<^bsub>UTXO\<^esub>{_} _\<close> [51, 0, 51] 50)
@@ -125,6 +124,6 @@ inductive utxo_sts :: "utxo_env \<Rightarrow> utxo_state \<Rightarrow> tx \<Righ
       and "refunded = key_refunds pp stk_creds tx"
       and "decayed = decayed_tx pp stk_creds tx"
       and "deposit_change = deposits pp stpools (txcerts tx) - (refunded + decayed)"
-      and "ups' = ups" \<comment> \<open>TODO: Continue later\<close>
+      and "(slot, pp, gen_delegs) \<turnstile> ups \<rightarrow>\<^bsub>UP\<^esub>{txup tx} ups'"
 
 end

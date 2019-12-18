@@ -110,8 +110,8 @@ lemma utxo_value_preservation:
 proof -
   from assms show ?thesis
   proof cases
-    case (utxo_inductive utxo pp stk_creds stpools refunded decayed deposit_change ups' ups slot
-      gen_delegs deps fees)
+    case (utxo_inductive utxo pp stk_creds stpools refunded decayed deposit_change slot
+      gen_delegs ups ups' deps fees)
     from \<open>s' =
       (txins tx \<lhd>/ utxo ++\<^sub>f outs tx, deps + deposit_change, fees + txfee tx + decayed, ups')\<close>
     have "val_utxo_state s' =
