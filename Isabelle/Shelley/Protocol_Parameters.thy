@@ -16,8 +16,4 @@ text \<open> Protocol parameter map \<close>
 
 type_synonym p_params = "(ppm, pvalue) fmap"
 
-text \<open> Reward account \<close>
-
-typedecl addr_rwd \<comment> \<open>NOTE: Abstract for now\<close>
-
 end
