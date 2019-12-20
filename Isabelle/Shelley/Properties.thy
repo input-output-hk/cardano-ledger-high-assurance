@@ -192,4 +192,72 @@ proof -
   qed
 qed
 
+fun val_deleg_state :: "d_state \<Rightarrow> coin" where
+  "val_deleg_state rewards = val_map rewards"
+
+lemma val_map_dom_exc_singleton:
+  assumes "m $$ k = Some v"
+  shows "val_map ({k} \<lhd>/ m) = val_map m - v"
+proof -
+  from assms have *: "val_map ({k} \<lhd> m) = val_map {k $$:= v}"
+    using dom_res_singleton by metis
+  have "val_map ({k} \<lhd>/ m) = val_map ({k} \<lhd> m) + val_map ({k} \<lhd>/ m) - val_map ({k} \<lhd> m)"
+    by simp
+  also have "\<dots> = val_map ({k} \<lhd>/ m) + val_map ({k} \<lhd> m) - val_map ({k} \<lhd> m)"
+    by simp
+  also have "\<dots> = val_map m - val_map ({k} \<lhd> m)"
+    using val_map_split by metis
+  also from * and assms have "\<dots> = val_map m - val_map {k $$:= v}"
+    by linarith
+  finally show ?thesis
+    by simp
+qed
+
+lemma delegation_value_preservation:
+  assumes "\<Gamma> \<turnstile> s \<rightarrow>\<^bsub>DELEG\<^esub>{c} s'"
+  shows "val_deleg_state s = val_deleg_state s'"
+proof -
+  from assms show ?thesis
+  proof cases
+    case (deleg_reg hk)
+    from \<open>s' = s \<union>\<^sub>\<leftarrow> {addr_rwd hk $$:= 0}\<close>
+    have *: "val_deleg_state s' = val_deleg_state (s \<union>\<^sub>\<leftarrow> {addr_rwd hk $$:= 0})"
+      by simp
+    then show ?thesis
+    proof (cases "addr_rwd hk \<in> fmdom' s")
+      case True
+      then have "s \<union>\<^sub>\<leftarrow> {addr_rwd hk $$:= 0} = s"
+        by simp
+      then have "val_deleg_state (s \<union>\<^sub>\<leftarrow> {addr_rwd hk $$:= 0}) = val_deleg_state s"
+        by simp
+      with * show ?thesis
+        by simp
+    next
+      case False
+      then have **: "s \<union>\<^sub>\<leftarrow> {addr_rwd hk $$:= 0} = s ++\<^sub>f {addr_rwd hk $$:= 0}"
+        by simp
+      with False have "fmdom' s \<inter> fmdom' {addr_rwd hk $$:= 0} = {}"
+        by simp
+      then have "val_map (s ++\<^sub>f {addr_rwd hk $$:= 0}) = val_map s + val_map {addr_rwd hk $$:= 0}"
+        using val_map_union by blast
+      also have "\<dots> = val_map s + 0"
+        by simp
+      finally have "val_deleg_state (s ++\<^sub>f {addr_rwd hk $$:= 0}) = val_deleg_state s"
+        by auto
+      with * and ** show ?thesis
+        by presburger
+    qed
+  next
+    case (deleg_dereg hk)
+    then have "val_deleg_state s' = val_map s'"
+      by simp
+    also from \<open>s' = {addr_rwd hk} \<lhd>/ s\<close> have "\<dots> = val_map ({addr_rwd hk} \<lhd>/ s)"
+      by simp
+    also from \<open>s $$ (addr_rwd hk) = Some 0\<close> have "\<dots> = val_map s - 0"
+      using val_map_dom_exc_singleton by fast
+    finally show ?thesis
+      by simp
+  qed
+qed
+
 end

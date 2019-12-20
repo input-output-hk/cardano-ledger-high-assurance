@@ -112,7 +112,44 @@ text \<open> Domain exclusion \<close>
 abbreviation dom_exc :: "'a set \<Rightarrow> ('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap" (infixl \<open>\<lhd>'/\<close> 150) where
   "s \<lhd>/ m \<equiv> fmfilter (\<lambda>x. x \<notin> s) m"
 
+text \<open> Union override left \<close>
+
+abbreviation union_override_left :: "('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap" (infixl \<open>\<union>\<^sub>\<leftarrow>\<close> 100) where
+  "m\<^sub>1 \<union>\<^sub>\<leftarrow> m\<^sub>2 \<equiv> m\<^sub>1 ++\<^sub>f (fmdom' m\<^sub>1 \<lhd>/ m\<^sub>2)"
+
 text \<open> Extra lemmas for \<open>\<lhd>\<close> and \<open>\<lhd>/\<close> \<close>
+
+lemma dom_res_singleton:
+  assumes "m $$ k = Some v"
+  shows "{k} \<lhd> m = {k $$:= v}"
+  using assms
+proof (induction m rule: fmap_induct)
+  case fmempty
+  then show ?case
+    by simp
+next
+  case (fmupd k' v' m)
+  then show ?case
+  proof (cases "k = k'")
+    case True
+    with \<open>m(k' $$:= v') $$ k = Some v\<close> have "v = v'"
+      by simp
+    with True have "{k} \<lhd> m(k' $$:= v') = ({k} \<lhd> m)(k $$:= v)"
+      by simp
+    also from True and \<open>m $$ k' = None\<close> have "\<dots> = {$$}(k $$:= v)"
+      by (simp add: fmap_ext)
+    finally show ?thesis
+      by simp
+  next
+    case False
+    with \<open>m(k' $$:= v') $$ k = Some v\<close> have *: "m $$ k = Some v"
+      by simp
+    with False have "{k} \<lhd> m(k' $$:= v') = {k} \<lhd> m"
+      by simp
+    with * and fmupd.IH show ?thesis
+      by simp
+  qed
+qed
 
 lemma dom_exc_add_distr:
   shows "s \<lhd>/ (m\<^sub>1 ++\<^sub>f m\<^sub>2) = (s \<lhd>/ m\<^sub>1) ++\<^sub>f (s \<lhd>/ m\<^sub>2)"
