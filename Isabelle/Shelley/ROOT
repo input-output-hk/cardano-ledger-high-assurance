@@ -13,6 +13,7 @@ session Shelley (ledgerformalization) = HOL +
     Transaction
     Update
     UTxO
+    Delegation_Certificates
     Delegation
     Properties
   document_files

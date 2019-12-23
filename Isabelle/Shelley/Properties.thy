@@ -1,7 +1,7 @@
 section \<open> Properties \<close>
 
 theory Properties
-  imports UTxO
+  imports UTxO Delegation
 begin
 
 subsection \<open> Preservation of Value \<close>
@@ -37,11 +37,12 @@ proof -
     by simp
 qed
 
+\<comment> \<open>NOTE: Lemma 15.4 in the spec.\<close>
 lemma val_map_union:
   assumes "fmdom' m\<^sub>1 \<inter> fmdom' m\<^sub>2 = {}"
   shows "val_map (m\<^sub>1 ++\<^sub>f m\<^sub>2) = val_map m\<^sub>1 + val_map m\<^sub>2"
   using assms
-proof (induction m\<^sub>2 arbitrary: m\<^sub>1 rule: fmap_induct)
+proof (induction m\<^sub>2 arbitrary: m\<^sub>1)
   case fmempty
   then show ?case
     by simp
@@ -60,7 +61,7 @@ next
     ultimately have "k \<notin> fmdom' (m\<^sub>1 ++\<^sub>f m\<^sub>2)"
       by simp
     then show ?thesis
-      using val_map_add by (metis sum.cong)
+      using val_map_add by metis
   qed
   also from fmupd.prems and fmupd.IH have "\<dots> = val_map m\<^sub>1 + val_map m\<^sub>2 + c"
     by simp
@@ -74,6 +75,7 @@ next
   finally show ?case .
 qed
 
+\<comment> \<open>NOTE: Lemma 15.3 in the spec.\<close>
 lemma val_map_split:
   shows "val_map m = val_map (s \<lhd>/ m) + val_map (s \<lhd> m)"
 proof -
@@ -98,6 +100,7 @@ qed
 
 text \<open>
   NOTE:
+  \<^item> Lemma 15.5 in the spec.
   \<^item> The proof in the document applies lemmas 15.3 and 15.4 on \<open>utxo\<close>'s,
     however this is incorrect since the range of \<open>utxo\<close> is not \<open>coin\<close> but
     \<open>(addr, coin)\<close>.
@@ -105,7 +108,7 @@ text \<open>
     precondition, which is not trivial to formalize.
 \<close>
 lemma utxo_value_preservation:
-  assumes "\<Gamma> \<turnstile> s \<rightarrow>\<^bsub>UTXO\<^esub>{tx} s'"
+  assumes "e \<turnstile> s \<rightarrow>\<^bsub>UTXO\<^esub>{tx} s'"
   shows "val_utxo_state s + wbalance (txwdrls tx) = val_utxo_state s'"
 proof -
   from assms show ?thesis
@@ -213,8 +216,9 @@ proof -
     by simp
 qed
 
-lemma delegation_value_preservation:
-  assumes "\<Gamma> \<turnstile> s \<rightarrow>\<^bsub>DELEG\<^esub>{c} s'"
+\<comment> \<open>NOTE: Lemma 15.6 in the spec.\<close>
+lemma deleg_value_preservation:
+  assumes "e \<turnstile> s \<rightarrow>\<^bsub>DELEG\<^esub>{c} s'"
   shows "val_deleg_state s = val_deleg_state s'"
 proof -
   from assms show ?thesis
@@ -258,6 +262,162 @@ proof -
     finally show ?thesis
       by simp
   qed
+qed
+
+fun val_delegs_state :: "d_p_state \<Rightarrow> coin" where
+  "val_delegs_state (rewards, _) = val_deleg_state rewards"
+
+lemma val_map_minus:
+  assumes "m\<^sub>2 \<subseteq>\<^sub>f m\<^sub>1"
+  shows "val_map (m\<^sub>1 --\<^sub>f m\<^sub>2) = val_map m\<^sub>1 - val_map m\<^sub>2"
+  using assms
+proof (induction m\<^sub>2 arbitrary: m\<^sub>1)
+  case fmempty
+  then show ?case
+    by simp
+next
+  case (fmupd k v m\<^sub>2)
+  have "val_map (m\<^sub>1 --\<^sub>f m\<^sub>2(k $$:= v)) = val_map ({k} \<lhd>/ (m\<^sub>1 --\<^sub>f m\<^sub>2))"
+    by simp
+  also have "\<dots> = val_map ({k} \<lhd>/ m\<^sub>1) - val_map m\<^sub>2"
+  proof -
+    from fmupd.prems and fmupd.hyps have "m\<^sub>2 \<subseteq>\<^sub>f {k} \<lhd>/ m\<^sub>1"
+      using fmdiff_fmupd
+      by (metis fmdom'_empty fmdom'_fmupd fmdrop_set_single fmfilter_alt_defs(2) fmsubset_drop_mono)
+    with fmupd.IH have "val_map ({k} \<lhd>/ m\<^sub>1) - val_map m\<^sub>2 = val_map (fmdom' m\<^sub>2 \<lhd>/ ({k} \<lhd>/ m\<^sub>1))"
+      by presburger
+    then show ?thesis
+      by (metis fmfilter_comm)
+  qed
+  also have "\<dots> = (val_map m\<^sub>1 - v) - val_map m\<^sub>2"
+  proof -
+    from fmupd.prems have "m\<^sub>1 $$ k = Some v"
+      by (fastforce simp add: fmsubset_alt_def)
+    with fmupd.prems show ?thesis
+      using val_map_dom_exc_singleton by fastforce
+  qed
+  also have "\<dots> = val_map m\<^sub>1 - val_map (m\<^sub>2(k $$:= v))"
+  proof -
+    have "\<dots> = val_map m\<^sub>1 - (val_map m\<^sub>2 + v)"
+      by simp
+    with fmupd.hyps show ?thesis
+      using val_map_add by (metis fmdom'_notI)
+  qed
+  finally show ?case .
+qed
+
+lemma fmran_fmmap_const:
+  assumes "m \<noteq> {$$}"
+  shows "fmran (fmmap (\<lambda>_. v) m) = {|v|}"
+  using assms
+proof (induction m)
+  case fmempty
+  then show ?case by simp
+next
+  case (fmupd k' v' m)
+  then show ?case
+  proof (cases "m \<noteq> {$$}")
+    case True
+    have "fmmap (\<lambda>_. v) m(k' $$:= v') = fmmap (\<lambda>_. v) m ++\<^sub>f {k' $$:= v}"
+      by (smt dom_res_singleton dom_res_singleton fmadd_empty(1) fmadd_empty(1) fmadd_empty(2) fmfilter_fmmap fmlookup_map fmmap_add fmupd_alt_def fmupd_lookup option.simps(9))
+    then have "fmran (fmmap (\<lambda>_. v) m(k' $$:= v')) = fmran (fmmap (\<lambda>_. v) m ++\<^sub>f {k' $$:= v})"
+      by simp
+    also have "\<dots> = fmran (fmmap (\<lambda>_. v) m) |\<union>| fmran {k' $$:= v}"
+    proof -
+      from \<open>m $$ k' = None\<close> have "fmdom (fmmap (\<lambda>_. v) m) |\<inter>| fmdom {k' $$:= v} = {||}"
+        by (simp add: fmdom_notI)
+      with \<open>m $$ k' = None\<close> show ?thesis
+        by (smt finter_absorb finter_commute finter_funion_distrib2 fmadd_restrict_right_dom fmap_singleton_comm fmdom_add fmdom_map fmdom_notD fmdom_notI fmimage_dom fmimage_union fmran_restrict_fset)
+    qed
+    also from True and fmupd.IH have "\<dots> = {|v|} |\<union>| fmran {k' $$:= v}"
+      by simp
+    finally show ?thesis
+      by (simp add: fmran_singleton)
+  next
+    case False
+    then have "fmmap (\<lambda>_. v) m(k' $$:= v') = {k' $$:= v}"
+      by (smt dom_res_singleton dom_res_singleton fmadd_empty(1) fmadd_empty(1) fmadd_empty(2) fmfilter_fmmap fmlookup_map fmmap_add fmupd_alt_def fmupd_lookup option.simps(9))
+    then show ?thesis
+      by (simp add: fmran_singleton)
+  qed
+qed
+
+lemma val_map_subset_zeroing:
+  assumes "m\<^sub>2 \<subseteq>\<^sub>f m\<^sub>1"
+  shows "val_map (m\<^sub>1 \<union>\<^sub>\<rightarrow> fmmap (\<lambda>_. 0::coin) m\<^sub>2) = val_map (m\<^sub>1 --\<^sub>f m\<^sub>2)"
+  using assms
+proof (cases "m\<^sub>2 = {$$}")
+  case True
+  then show ?thesis
+    by auto
+next
+  case False
+  let ?m = "fmmap (\<lambda>_. 0::coin) m\<^sub>2"
+  have "fmdom' (fmdom' ?m \<lhd>/ m\<^sub>1) \<inter> fmdom' ?m = {}"
+    by auto
+  then have "val_map (m\<^sub>1 \<union>\<^sub>\<rightarrow> ?m) = val_map (fmdom' ?m \<lhd>/ m\<^sub>1) + val_map ?m"
+    using val_map_union by blast
+  also have "\<dots> = val_map (fmdom' ?m \<lhd>/ m\<^sub>1)"
+  proof -
+    from False have "fmran ?m = {|0::coin|}"
+      using fmran_fmmap_const by simp
+    then show ?thesis
+      by (smt fmdom'_map fmlookup_dom'_iff fmlookup_map option.map(2) option.sel
+          sum.not_neutral_contains_not_neutral)
+  qed
+  also have *: "\<dots> = val_map m\<^sub>1 - val_map (fmdom' ?m \<lhd> m\<^sub>1)"
+    using val_map_split by (metis add.commute add_diff_cancel_left')
+  finally show ?thesis
+    using \<open>m\<^sub>2 \<subseteq>\<^sub>f m\<^sub>1\<close> and * and val_map_minus by force
+qed
+
+\<comment> \<open>NOTE: Lemma 15.7 in the spec.\<close>
+lemma delegs_value_preservation:
+  assumes "(slot, tx) \<turnstile> (rewards, pstate) \<rightarrow>\<^bsub>DELEGS\<^esub>{\<Gamma>} (rewards', pstate)"
+  shows "val_delegs_state (rewards, pstate) =
+         val_delegs_state (rewards', pstate) + wbalance (txwdrls tx)"
+  using assms
+proof (induction "(slot, tx)" "(rewards, pstate)" \<Gamma> "(rewards', pstate)" arbitrary: slot tx rewards
+       pstate rewards' rule: delegs_sts.induct)
+  case (seq_delg_base wdrls tx rewards rewards' slot pstate)
+  have "val_delegs_state (rewards, pstate) = val_map rewards"
+    by simp
+  also have "\<dots> = val_map wdrls + val_map (rewards --\<^sub>f wdrls)"
+    proof -
+      from \<open>wdrls \<subseteq>\<^sub>f rewards\<close> have "rewards = wdrls ++\<^sub>f (rewards --\<^sub>f wdrls)"
+        by (simp add: fmdiff_partition)
+      moreover have "fmdom' wdrls \<inter> fmdom' (rewards --\<^sub>f wdrls) = {}"
+        by auto
+      ultimately show ?thesis
+        using val_map_union by metis
+    qed
+    also from \<open>wdrls = txwdrls tx\<close> have "\<dots> = val_map (rewards --\<^sub>f wdrls) + wbalance (txwdrls tx)"
+      by auto
+    also from \<open>wdrls \<subseteq>\<^sub>f rewards\<close> have "\<dots> =
+      val_map (rewards \<union>\<^sub>\<rightarrow> fmmap (\<lambda>_. 0) wdrls) + wbalance (txwdrls tx)"
+      using val_map_subset_zeroing by fastforce
+    also from \<open>rewards' = rewards \<union>\<^sub>\<rightarrow> fmmap (\<lambda>_. 0) wdrls\<close> have "\<dots> =
+      val_map rewards' + wbalance (txwdrls tx)"
+      by simp
+    finally show ?case
+      by simp
+next
+  case (seq_delg_ind slot tx \<Gamma> dpstate' c)
+  from \<open>slot \<turnstile> dpstate' \<rightarrow>\<^bsub>DELPL\<^esub>{c} (rewards', pstate)\<close> have "snd dpstate' = pstate"
+    using delpl_sts.simps by auto
+  with seq_delg_ind.hyps(2) have "val_delegs_state (rewards, pstate) =
+    val_delegs_state (fst dpstate', pstate) + val_map (txwdrls tx)"
+    by auto
+  moreover have "val_deleg_state (fst dpstate') = val_deleg_state rewards'"
+  proof -
+    from \<open>slot \<turnstile> dpstate' \<rightarrow>\<^bsub>DELPL\<^esub>{c} (rewards', pstate)\<close>
+    have "slot \<turnstile> (fst dpstate') \<rightarrow>\<^bsub>DELEG\<^esub>{c} rewards'"
+      using delpl_sts.simps by auto
+    then show ?thesis
+      using deleg_value_preservation by simp
+  qed
+  ultimately show ?case
+    by simp
 qed
 
 end

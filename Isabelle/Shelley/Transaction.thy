@@ -1,7 +1,7 @@
 section \<open> Transactions \<close>
 
 theory Transaction
-  imports Basic_Types Address Finite_Map_Extras Delegation Update
+  imports Basic_Types Address Finite_Map_Extras Delegation_Certificates Update
 begin
 
 text \<open> Transaction ID \<close>

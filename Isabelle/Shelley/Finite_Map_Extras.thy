@@ -45,7 +45,7 @@ lemma fmap_singleton_comm:
   assumes "m $$ k = None"
   shows "m ++\<^sub>f {k $$:= v} = {k $$:= v} ++\<^sub>f m"
   using assms
-proof (induction m arbitrary: k v rule: fmap_induct)
+proof (induction m arbitrary: k v)
   case fmempty
   then show ?case
     by simp
@@ -78,7 +78,7 @@ lemma fmap_disj_comm:
   assumes "fmdom' m\<^sub>1 \<inter> fmdom' m\<^sub>2 = {}"
   shows "m\<^sub>1 ++\<^sub>f m\<^sub>2 = m\<^sub>2 ++\<^sub>f m\<^sub>1"
   using assms
-proof (induction m\<^sub>2 arbitrary: m\<^sub>1 rule: fmap_induct)
+proof (induction m\<^sub>2 arbitrary: m\<^sub>1)
   case fmempty
   then show ?case
     by simp
@@ -97,10 +97,49 @@ next
       by simp
   next
     case False
-    then show ?thesis
-      using fmupd.prems by auto
+    with fmupd.prems show ?thesis
+      by auto
   qed
 qed
+
+(* TODO: Find a nicer proof *)
+lemma fmran_singleton: "fmran {k $$:= v} = {|v|}"
+proof -
+  have "\<And>v'. v' |\<in>| fmran {k $$:= v} \<Longrightarrow> v' = v"
+    by (metis fmdom_empty fmdom_fmupd fmdom_notD fmranE fmupd_lookup fsingleton_iff
+        option.distinct(1) option.sel)
+  moreover have "v |\<in>| fmran {k $$:= v}"
+    by (simp add: fmranI)
+  ultimately show ?thesis
+    by (simp add: fsubsetI fsubset_antisym)
+qed
+
+text \<open> Map difference \<close>
+
+abbreviation
+  fmdiff :: "('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap" (infixl \<open>--\<^sub>f\<close> 100) where
+  "m\<^sub>1 --\<^sub>f m\<^sub>2 \<equiv> fmfilter (\<lambda>x. x \<notin> fmdom' m\<^sub>2) m\<^sub>1"
+
+(* TODO: Find a nicer proof *)
+lemma fmdiff_partition:
+  assumes "m\<^sub>2 \<subseteq>\<^sub>f m\<^sub>1"
+  shows "m\<^sub>2 ++\<^sub>f (m\<^sub>1 --\<^sub>f m\<^sub>2) = m\<^sub>1"
+proof -
+  from assms have *: "m\<^sub>2 ++\<^sub>f (m\<^sub>1 --\<^sub>f m\<^sub>2) \<subseteq>\<^sub>f m\<^sub>1"
+    by (smt fmfilter_subset fmlookup_add fmpred_iff fmsubset_alt_def)
+  then have "m\<^sub>1 \<subseteq>\<^sub>f m\<^sub>2 ++\<^sub>f (m\<^sub>1 --\<^sub>f m\<^sub>2)"
+    by (simp add: fmsubset.rep_eq map_le_def)
+  with * show ?thesis
+    by (metis (no_types, lifting) domIff fmap_ext fmsubset.rep_eq map_le_def)
+qed
+
+(* TODO: Find a nicer proof *)
+lemma fmdiff_fmupd:
+  assumes "m $$ k = None"
+  shows "m(k $$:= v) --\<^sub>f {k $$:= v} = m"
+  using assms
+  by (smt Diff_iff Diff_insert_absorb fmdom'_empty fmdom'_fmupd fmdom'_notD fmdom'_notI
+      fmfilter_true fmfilter_upd option.simps(3) singletonI)
 
 text \<open> Domain restriction \<close>
 
@@ -112,9 +151,16 @@ text \<open> Domain exclusion \<close>
 abbreviation dom_exc :: "'a set \<Rightarrow> ('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap" (infixl \<open>\<lhd>'/\<close> 150) where
   "s \<lhd>/ m \<equiv> fmfilter (\<lambda>x. x \<notin> s) m"
 
+text \<open> Union override right \<close>
+
+abbreviation union_override_right :: "('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap"
+  (infixl \<open>\<union>\<^sub>\<rightarrow>\<close> 100) where
+  "m\<^sub>1 \<union>\<^sub>\<rightarrow> m\<^sub>2 \<equiv> (fmdom' m\<^sub>2 \<lhd>/ m\<^sub>1) ++\<^sub>f m\<^sub>2"
+
 text \<open> Union override left \<close>
 
-abbreviation union_override_left :: "('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap" (infixl \<open>\<union>\<^sub>\<leftarrow>\<close> 100) where
+abbreviation union_override_left :: "('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap"
+  (infixl \<open>\<union>\<^sub>\<leftarrow>\<close> 100) where
   "m\<^sub>1 \<union>\<^sub>\<leftarrow> m\<^sub>2 \<equiv> m\<^sub>1 ++\<^sub>f (fmdom' m\<^sub>1 \<lhd>/ m\<^sub>2)"
 
 text \<open> Extra lemmas for \<open>\<lhd>\<close> and \<open>\<lhd>/\<close> \<close>
@@ -123,7 +169,7 @@ lemma dom_res_singleton:
   assumes "m $$ k = Some v"
   shows "{k} \<lhd> m = {k $$:= v}"
   using assms
-proof (induction m rule: fmap_induct)
+proof (induction m)
   case fmempty
   then show ?case
     by simp
@@ -157,7 +203,7 @@ lemma dom_exc_add_distr:
 
 lemma fmap_partition:
   shows "m = s \<lhd>/ m ++\<^sub>f s \<lhd> m"
-proof (induction m rule: fmap_induct)
+proof (induction m)
   case fmempty
   then show ?case
     by simp
