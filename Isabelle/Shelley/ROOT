@@ -15,6 +15,7 @@ session Shelley (ledgerformalization) = HOL +
     UTxO
     Delegation_Certificates
     Delegation
+    Rewards
     Properties
   document_files
     "root.tex"
