@@ -1,7 +1,7 @@
 section \<open> Properties \<close>
 
 theory Properties
-  imports UTxO Delegation
+  imports UTxO Delegation Rewards
 begin
 
 subsection \<open> Preservation of Value \<close>
@@ -418,6 +418,158 @@ next
   qed
   ultimately show ?case
     by simp
+qed
+
+fun val_poolreap_state :: "pl_reap_state \<Rightarrow> coin" where
+  "val_poolreap_state ((_, deps, _, _), (treasury, _), rewards, _) =
+    val_coin deps + val_coin treasury + val_map rewards"
+
+lemma val_map_fmmap_keys:
+  assumes "fmdom' m\<^sub>2 \<subseteq> fmdom' m\<^sub>1"
+  shows "val_map (fmmap_keys (\<lambda>k v. v + m\<^sub>1 $$! k) m\<^sub>2) = val_map (fmdom' m\<^sub>2 \<lhd> m\<^sub>1) + val_map m\<^sub>2"
+  using assms
+proof (induction m\<^sub>2)
+  case fmempty
+  then show ?case
+    by auto
+next
+  case (fmupd x y m\<^sub>2)
+  have "val_map (fmmap_keys (\<lambda>k v. v + m\<^sub>1 $$! k) m\<^sub>2(x $$:= y)) =
+    val_map (fmmap_keys (\<lambda>k v. v + m\<^sub>1 $$! k) m\<^sub>2 ++\<^sub>f {x $$:= y + m\<^sub>1 $$! x})"
+  proof -
+    have "fmmap_keys (\<lambda>k v. v + m\<^sub>1 $$! k) m\<^sub>2(x $$:= y) =
+      fmmap_keys (\<lambda>k v. v + m\<^sub>1 $$! k) m\<^sub>2 ++\<^sub>f {x $$:= y + m\<^sub>1 $$! x}"
+      by transfer' (auto simp add: fmap_ext)
+    then show ?thesis
+      by simp
+  qed
+  also have "\<dots> =
+    val_map (fmmap_keys (\<lambda>k v. v + m\<^sub>1 $$! k) m\<^sub>2) + val_map {x $$:= y + m\<^sub>1 $$! x}"
+  proof -
+    from \<open>m\<^sub>2 $$ x = None\<close>
+    have "fmdom' (fmmap_keys (\<lambda>k v. v + m\<^sub>1 $$! k) m\<^sub>2) \<inter> fmdom' {x $$:= y + m\<^sub>1 $$! x} = {}"
+      by (simp add: fmdom'_notI)
+    then show ?thesis
+      using val_map_union by blast
+  qed
+  also have "\<dots> = 	val_map (fmmap_keys (\<lambda>k v. v + m\<^sub>1 $$! k) m\<^sub>2) + (y + m\<^sub>1 $$! x)"
+    by simp
+  also from \<open>fmdom' m\<^sub>2(x $$:= y) \<subseteq> fmdom' m\<^sub>1\<close> and fmupd.IH have "\<dots> =
+    val_map (fmdom' m\<^sub>2 \<lhd> m\<^sub>1) + val_map m\<^sub>2 + (y + m\<^sub>1 $$! x)"
+    by simp
+  also have "\<dots> = (val_map (fmdom' m\<^sub>2 \<lhd> m\<^sub>1) + m\<^sub>1 $$! x) + (val_map m\<^sub>2 + y)"
+    by simp
+  also have "\<dots> = val_map (fmdom' m\<^sub>2(x $$:= y) \<lhd> m\<^sub>1) + val_map m\<^sub>2(x $$:= y)"
+  proof -
+    have "val_map (fmdom' m\<^sub>2 \<lhd> m\<^sub>1) + m\<^sub>1 $$! x = val_map (fmdom' m\<^sub>2(x $$:= y) \<lhd> m\<^sub>1)"
+    proof -
+      from \<open>m\<^sub>2 $$ x = None\<close> have "val_map (fmdom' m\<^sub>2(x $$:= y) \<lhd> m\<^sub>1) = val_map ((fmdom' m\<^sub>2 \<union> {x}) \<lhd> m\<^sub>1)"
+        by simp
+      also have "\<dots> = val_map ((fmdom' m\<^sub>2 \<lhd> m\<^sub>1) ++\<^sub>f ({x} \<lhd> m\<^sub>1))"
+        using dom_res_union_distr by metis
+      also have "\<dots> = val_map (fmdom' m\<^sub>2 \<lhd> m\<^sub>1) + val_map ({x} \<lhd> m\<^sub>1)"
+      proof -
+        from \<open>fmdom' m\<^sub>2(x $$:= y) \<subseteq> fmdom' m\<^sub>1\<close> have "fmdom' (fmdom' m\<^sub>2 \<lhd> m\<^sub>1) = fmdom' m\<^sub>2"
+          by (auto simp add: fmfilter_alt_defs(4))
+        moreover from \<open>fmdom' m\<^sub>2(x $$:= y) \<subseteq> fmdom' m\<^sub>1\<close> have "fmdom' ({x} \<lhd> m\<^sub>1) = {x}"
+          by (auto simp add: equalityI)
+        ultimately have "fmdom' (fmdom' m\<^sub>2 \<lhd> m\<^sub>1) \<inter> fmdom' ({x} \<lhd> m\<^sub>1) = {}"
+          using \<open>m\<^sub>2 $$ x = None\<close> by (simp add: fmdom'_notI)
+        then show ?thesis
+          using val_map_union by blast
+      qed
+      also have "\<dots> = val_map (fmdom' m\<^sub>2 \<lhd> m\<^sub>1) + m\<^sub>1 $$! x"
+      proof -
+        from \<open>fmdom' m\<^sub>2(x $$:= y) \<subseteq> fmdom' m\<^sub>1\<close> have "x \<in> fmdom' m\<^sub>1" by simp
+        then have "fmdom' ({x} \<lhd> m\<^sub>1) = {x}"
+          by (auto simp add: equalityI)
+        then show ?thesis
+          by simp
+      qed
+      finally show ?thesis
+        by simp
+    qed
+    moreover from \<open>m\<^sub>2 $$ x = None\<close> have "val_map m\<^sub>2(x $$:= y) = val_map m\<^sub>2 + y"
+      using val_map_add by (metis fmdom'_notI)
+    ultimately show ?thesis
+      by linarith
+  qed
+  finally show ?case .
+qed
+
+lemma val_map_inter_plus:
+  assumes "fmdom' m\<^sub>2 \<subseteq> fmdom' m\<^sub>1"
+  shows "val_map (m\<^sub>1 \<inter>\<^sub>+ m\<^sub>2) = val_map (fmdom' m\<^sub>2 \<lhd> m\<^sub>1) + val_map m\<^sub>2"
+proof -
+  from \<open>fmdom' m\<^sub>2 \<subseteq> fmdom' m\<^sub>1\<close> have "m\<^sub>1 \<inter>\<^sub>+ m\<^sub>2 = fmmap_keys (\<lambda>k v. v + m\<^sub>1 $$! k) m\<^sub>2"
+    by (metis Un_iff fmdom'I fmfilter_true subset_Un_eq)
+  then have "val_map (m\<^sub>1 \<inter>\<^sub>+ m\<^sub>2) = val_map (fmmap_keys (\<lambda>k v. v + m\<^sub>1 $$! k) m\<^sub>2)"
+    by simp
+  also from \<open>fmdom' m\<^sub>2 \<subseteq> fmdom' m\<^sub>1\<close> have "\<dots> = val_map (fmdom' m\<^sub>2 \<lhd> m\<^sub>1) + val_map m\<^sub>2"
+    using val_map_fmmap_keys by blast
+  finally show ?thesis .
+qed
+
+lemma val_map_sym_diff:
+  assumes "fmdom' m\<^sub>2 \<subseteq> fmdom' m\<^sub>1"
+  shows "val_map (m\<^sub>1 \<Delta>\<^sub>f m\<^sub>2) = val_map m\<^sub>1 - val_map (fmdom' m\<^sub>2 \<lhd> m\<^sub>1)"
+proof -
+  from \<open>fmdom' m\<^sub>2 \<subseteq> fmdom' m\<^sub>1\<close> have "m\<^sub>1 \<Delta>\<^sub>f m\<^sub>2 = m\<^sub>1 --\<^sub>f m\<^sub>2"
+    by (metis Un_iff fmadd_empty(2) fmdom'I fmfilter_false subset_Un_eq)
+  then have "val_map (m\<^sub>1 \<Delta>\<^sub>f m\<^sub>2) = val_map (m\<^sub>1 --\<^sub>f m\<^sub>2)"
+    by simp
+  also from \<open>fmdom' m\<^sub>2 \<subseteq> fmdom' m\<^sub>1\<close> have "\<dots> = val_map m\<^sub>1 - val_map (fmdom' m\<^sub>2 \<lhd> m\<^sub>1)"
+    using val_map_split by (metis add_diff_cancel_right')
+  finally show ?thesis .
+qed
+
+\<comment> \<open>NOTE: Lemma 15.8 in the spec.\<close>
+lemma poolreap_value_preservation:
+  assumes "e \<turnstile> s \<rightarrow>\<^bsub>POOLREAP\<^esub>{\<epsilon>} s'"
+  shows "val_poolreap_state s = val_poolreap_state s'"
+proof -
+  from assms show ?thesis
+  proof cases
+    case (pool_reap reward_acnts' refunds rewards m_refunds refunded unclaimed utxo deps fees ups
+          treasury reserves pstate)
+    from pool_reap(2) have "val_poolreap_state s' =
+      deps - (unclaimed + refunded) + treasury + unclaimed + val_map (rewards \<union>\<^sub>+ refunds)"
+      by simp
+    also have "\<dots> = deps - refunded + treasury + val_map (rewards \<union>\<^sub>+ refunds)"
+      by simp
+    also have "\<dots> = deps - refunded + treasury + val_map rewards + val_map refunds"
+    proof -
+      have "val_map (rewards \<union>\<^sub>+ refunds) = val_map rewards + val_map refunds"
+      proof -
+        have "val_map (rewards \<union>\<^sub>+ refunds) =
+          val_map (rewards \<Delta>\<^sub>f refunds) + val_map (rewards \<inter>\<^sub>+ refunds)"
+        proof -
+          from \<open>refunds = fmdom' rewards \<lhd> reward_acnts'\<close>
+          have "fmdom' (rewards \<Delta>\<^sub>f refunds) \<inter> fmdom' (rewards \<inter>\<^sub>+ refunds) = {}"
+            by (smt Int_emptyI fmadd_empty(2) fmdom'_filter fmdom'_notI fmfilter_false
+                fmlookup_restrict_set fmrestrict_set_dom fmrestrict_set_fmmap_keys member_filter
+                option.distinct(1)) (* TODO: Find a nicer proof. *)
+          then show ?thesis
+            using val_map_union by blast
+        qed
+        also have "\<dots> = val_map rewards - val_map (fmdom' refunds \<lhd> rewards) +
+          val_map (fmdom' refunds \<lhd> rewards) + val_map refunds"
+        proof -
+          from \<open>refunds = fmdom' rewards \<lhd> reward_acnts'\<close> have "fmdom' refunds \<subseteq> fmdom' rewards"
+            by auto
+          then show ?thesis
+            using val_map_sym_diff and val_map_inter_plus by fastforce
+        qed
+        finally show ?thesis
+          by simp
+      qed
+      then show ?thesis
+        by linarith
+    qed
+    finally show ?thesis
+      using \<open>s = ((utxo, deps, fees, ups), (treasury, reserves), rewards, pstate)\<close> and
+        \<open>refunded = val_map refunds\<close> by simp
+  qed
 qed
 
 end

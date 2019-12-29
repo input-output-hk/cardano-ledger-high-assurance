@@ -4,7 +4,11 @@ theory Basic_Types
   imports "HOL-Library.Countable"
 begin
 
-text \<open> Coin \<close>
+text \<open> Epoch \<close>
+
+typedecl epoch
+
+text \<open> Unit of value \<close>
 
 type_synonym coin = int
 

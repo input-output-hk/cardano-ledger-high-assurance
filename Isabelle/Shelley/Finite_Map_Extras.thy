@@ -141,6 +141,11 @@ lemma fmdiff_fmupd:
   by (smt Diff_iff Diff_insert_absorb fmdom'_empty fmdom'_fmupd fmdom'_notD fmdom'_notI
       fmfilter_true fmfilter_upd option.simps(3) singletonI)
 
+text \<open> Map symmetric difference \<close>
+
+abbreviation fmsym_diff :: "('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap" (infixl "\<Delta>\<^sub>f" 100) where
+  "m\<^sub>1 \<Delta>\<^sub>f m\<^sub>2 \<equiv> (m\<^sub>1 --\<^sub>f m\<^sub>2) ++\<^sub>f (m\<^sub>2 --\<^sub>f m\<^sub>1)"
+
 text \<open> Domain restriction \<close>
 
 abbreviation dom_res :: "'a set \<Rightarrow> ('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap" (infixl \<open>\<lhd>\<close> 150) where
@@ -151,17 +156,33 @@ text \<open> Domain exclusion \<close>
 abbreviation dom_exc :: "'a set \<Rightarrow> ('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap" (infixl \<open>\<lhd>'/\<close> 150) where
   "s \<lhd>/ m \<equiv> fmfilter (\<lambda>x. x \<notin> s) m"
 
+text \<open> Intersection plus \<close>
+
+abbreviation intersection_plus :: "('a, 'b::monoid_add) fmap \<Rightarrow> ('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap"
+  (infixl "\<inter>\<^sub>+" 100)
+where
+  "m\<^sub>1 \<inter>\<^sub>+ m\<^sub>2 \<equiv> fmmap_keys (\<lambda>k v. v + m\<^sub>1 $$! k) (fmdom' m\<^sub>1 \<lhd> m\<^sub>2)"
+
 text \<open> Union override right \<close>
 
 abbreviation union_override_right :: "('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap"
-  (infixl \<open>\<union>\<^sub>\<rightarrow>\<close> 100) where
+  (infixl \<open>\<union>\<^sub>\<rightarrow>\<close> 100)
+where
   "m\<^sub>1 \<union>\<^sub>\<rightarrow> m\<^sub>2 \<equiv> (fmdom' m\<^sub>2 \<lhd>/ m\<^sub>1) ++\<^sub>f m\<^sub>2"
 
 text \<open> Union override left \<close>
 
 abbreviation union_override_left :: "('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap"
-  (infixl \<open>\<union>\<^sub>\<leftarrow>\<close> 100) where
+  (infixl \<open>\<union>\<^sub>\<leftarrow>\<close> 100)
+where
   "m\<^sub>1 \<union>\<^sub>\<leftarrow> m\<^sub>2 \<equiv> m\<^sub>1 ++\<^sub>f (fmdom' m\<^sub>1 \<lhd>/ m\<^sub>2)"
+
+text \<open> Union override plus \<close>
+
+abbreviation union_override_plus :: "('a, 'b::monoid_add) fmap \<Rightarrow> ('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap"
+  (infixl \<open>\<union>\<^sub>+\<close> 100)
+where
+  "m\<^sub>1 \<union>\<^sub>+ m\<^sub>2 \<equiv> (m\<^sub>1 \<Delta>\<^sub>f m\<^sub>2) ++\<^sub>f (m\<^sub>1 \<inter>\<^sub>+ m\<^sub>2)"
 
 text \<open> Extra lemmas for \<open>\<lhd>\<close> and \<open>\<lhd>/\<close> \<close>
 
@@ -195,6 +216,21 @@ next
     with * and fmupd.IH show ?thesis
       by simp
   qed
+qed
+
+(* TODO: Find a nicer proof *)
+lemma dom_res_union_distr:
+  shows "(A \<union> B) \<lhd> m = A \<lhd> m ++\<^sub>f B \<lhd> m"
+proof -
+  have "(A \<union> B) \<lhd> m \<subseteq>\<^sub>f A \<lhd> m ++\<^sub>f B \<lhd> m"
+    by (smt Un_iff domIff dom_fmlookup fmdom'_add fmdom'_filter fmfilter_subset fmlookup_add
+        fmsubset.rep_eq map_le_def member_filter)
+  moreover have "A \<lhd> m ++\<^sub>f B \<lhd> m \<subseteq>\<^sub>f (A \<union> B) \<lhd> m"
+    by (smt Un_iff domIff dom_fmlookup fmdom'_filter fmfilter_subset fmlookup_add fmsubset.rep_eq
+        map_le_def member_filter)
+  ultimately show ?thesis
+    by (smt Un_iff domIff dom_fmlookup fmadd_empty(2) fmdiff_partition fmdom'_add fmfilter_false
+        option.simps(3))
 qed
 
 lemma dom_exc_add_distr:
