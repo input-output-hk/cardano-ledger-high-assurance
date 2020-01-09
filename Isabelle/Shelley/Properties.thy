@@ -21,18 +21,18 @@ fun val_utxo_state :: "utxo_state \<Rightarrow> coin" where
   "val_utxo_state (utxo, deps, fees, _) = val_utxo utxo + deps + fees"
 
 lemma val_map_add:
-  assumes "k \<notin> fmdom' m"
+  assumes "m $$ k = None"
   shows "val_map m(k $$:= c) = val_map m + c"
 proof -
   let ?m' = "m(k $$:= c)"
   have "val_map ?m' = (\<Sum>k\<^sub>i \<in> fmdom' m \<union> {k}. ?m' $$! k\<^sub>i)"
     by simp
   also from assms have "\<dots> = (\<Sum>k\<^sub>i \<in> fmdom' m. ?m' $$! k\<^sub>i) + (?m' $$! k)"
-    by simp
+    by (simp add: fmdom'_notI)
   also have "\<dots> = (\<Sum>k\<^sub>i \<in> fmdom' m. ?m' $$! k\<^sub>i) + c"
     by simp
   also from assms have "\<dots> = (\<Sum>k\<^sub>i \<in> fmdom' m. m $$! k\<^sub>i) + c"
-    by (metis (no_types, lifting) fmupd_lookup sum.cong)
+    by (metis (no_types, lifting) fmdom'_notI fmupd_lookup sum.cong)
   finally show ?thesis
     by simp
 qed
@@ -54,24 +54,17 @@ next
   proof -
     have "fmdom' (m\<^sub>1 ++\<^sub>f m\<^sub>2) = fmdom' m\<^sub>1 \<union> fmdom' m\<^sub>2"
       by simp
-    moreover from fmupd.prems have "k \<notin> fmdom' m\<^sub>1"
+    moreover from fmupd.prems have "m\<^sub>1 $$ k = None"
       by auto
-    moreover from fmupd.hyps have "k \<notin> fmdom' m\<^sub>2"
-      by (simp add: fmdom'_notI)
-    ultimately have "k \<notin> fmdom' (m\<^sub>1 ++\<^sub>f m\<^sub>2)"
-      by simp
+    ultimately have "(m\<^sub>1 ++\<^sub>f m\<^sub>2) $$ k = None"
+      using fmupd.hyps by simp
     then show ?thesis
       using val_map_add by metis
   qed
   also from fmupd.prems and fmupd.IH have "\<dots> = val_map m\<^sub>1 + val_map m\<^sub>2 + c"
     by simp
-  also have "\<dots> = val_map m\<^sub>1 + val_map (m\<^sub>2(k $$:= c))"
-  proof -
-    from fmupd.hyps have "k \<notin> fmdom' m\<^sub>2"
-      by (simp add: fmdom'_notI)
-    then show ?thesis
-      using val_map_add by (metis (full_types) add.assoc)
-  qed
+  also from fmupd.hyps have "\<dots> = val_map m\<^sub>1 + val_map (m\<^sub>2(k $$:= c))"
+    using val_map_add by (smt sum.cong)
   finally show ?case .
 qed
 
@@ -196,7 +189,7 @@ proof -
 qed
 
 fun val_deleg_state :: "d_state \<Rightarrow> coin" where
-  "val_deleg_state rewards = val_map rewards"
+  "val_deleg_state (_, rewards, _) = val_map rewards"
 
 lemma val_map_dom_exc_singleton:
   assumes "m $$ k = Some v"
@@ -223,49 +216,53 @@ lemma deleg_value_preservation:
 proof -
   from assms show ?thesis
   proof cases
-    case (deleg_reg hk)
-    from \<open>s' = s \<union>\<^sub>\<leftarrow> {addr_rwd hk $$:= 0}\<close>
-    have *: "val_deleg_state s' = val_deleg_state (s \<union>\<^sub>\<leftarrow> {addr_rwd hk $$:= 0})"
+    case (deleg_reg hk stk_creds rewards i\<^sub>r\<^sub>w\<^sub>d)
+    from \<open>s' = (stk_creds ++\<^sub>f {hk $$:= e}, rewards \<union>\<^sub>\<leftarrow> {addr_rwd hk $$:= 0}, i\<^sub>r\<^sub>w\<^sub>d)\<close>
+    have *: "val_deleg_state s' =
+      val_deleg_state (stk_creds ++\<^sub>f {hk $$:= e}, rewards \<union>\<^sub>\<leftarrow> {addr_rwd hk $$:= 0}, i\<^sub>r\<^sub>w\<^sub>d)"
       by simp
     then show ?thesis
-    proof (cases "addr_rwd hk \<in> fmdom' s")
+    proof (cases "addr_rwd hk \<in> fmdom' rewards")
       case True
-      then have "s \<union>\<^sub>\<leftarrow> {addr_rwd hk $$:= 0} = s"
+      then have "rewards \<union>\<^sub>\<leftarrow> {addr_rwd hk $$:= 0} = rewards"
         by simp
-      then have "val_deleg_state (s \<union>\<^sub>\<leftarrow> {addr_rwd hk $$:= 0}) = val_deleg_state s"
+      with \<open>s = (stk_creds, rewards, i\<^sub>r\<^sub>w\<^sub>d)\<close>
+      have "val_deleg_state (stk_creds ++\<^sub>f {hk $$:= e}, rewards \<union>\<^sub>\<leftarrow> {addr_rwd hk $$:= 0}, i\<^sub>r\<^sub>w\<^sub>d) =
+        val_deleg_state s"
         by simp
       with * show ?thesis
         by simp
     next
       case False
-      then have **: "s \<union>\<^sub>\<leftarrow> {addr_rwd hk $$:= 0} = s ++\<^sub>f {addr_rwd hk $$:= 0}"
+      then have **: "rewards \<union>\<^sub>\<leftarrow> {addr_rwd hk $$:= 0} = rewards ++\<^sub>f {addr_rwd hk $$:= 0}"
         by simp
-      with False have "fmdom' s \<inter> fmdom' {addr_rwd hk $$:= 0} = {}"
+      with False have "fmdom' rewards \<inter> fmdom' {addr_rwd hk $$:= 0} = {}"
         by simp
-      then have "val_map (s ++\<^sub>f {addr_rwd hk $$:= 0}) = val_map s + val_map {addr_rwd hk $$:= 0}"
+      then have "val_map (rewards ++\<^sub>f {addr_rwd hk $$:= 0}) =
+        val_map rewards + val_map {addr_rwd hk $$:= 0}"
         using val_map_union by blast
-      also have "\<dots> = val_map s + 0"
+      also have "\<dots> = val_map rewards + 0"
         by simp
-      finally have "val_deleg_state (s ++\<^sub>f {addr_rwd hk $$:= 0}) = val_deleg_state s"
-        by auto
+      finally have "
+        val_deleg_state (stk_creds ++\<^sub>f {hk $$:= e}, rewards ++\<^sub>f {addr_rwd hk $$:= 0}, i\<^sub>r\<^sub>w\<^sub>d) =
+        val_deleg_state s"
+        using \<open>s = (stk_creds, rewards, i\<^sub>r\<^sub>w\<^sub>d)\<close> by auto
       with * and ** show ?thesis
         by presburger
     qed
   next
-    case (deleg_dereg hk)
-    then have "val_deleg_state s' = val_map s'"
+    case (deleg_dereg hk rewards stk_creds i\<^sub>r\<^sub>w\<^sub>d)
+    then have "val_deleg_state s' = val_map ({addr_rwd hk} \<lhd>/ rewards)"
       by simp
-    also from \<open>s' = {addr_rwd hk} \<lhd>/ s\<close> have "\<dots> = val_map ({addr_rwd hk} \<lhd>/ s)"
-      by simp
-    also from \<open>s $$ (addr_rwd hk) = Some 0\<close> have "\<dots> = val_map s - 0"
+    also from \<open>rewards $$ (addr_rwd hk) = Some 0\<close> have "\<dots> = val_map rewards - 0"
       using val_map_dom_exc_singleton by fast
     finally show ?thesis
-      by simp
+      using \<open>s = (stk_creds, rewards, i\<^sub>r\<^sub>w\<^sub>d)\<close> by simp
   qed
 qed
 
 fun val_delegs_state :: "d_p_state \<Rightarrow> coin" where
-  "val_delegs_state (rewards, _) = val_deleg_state rewards"
+  "val_delegs_state (d_state, _) = val_deleg_state d_state"
 
 lemma val_map_minus:
   assumes "m\<^sub>2 \<subseteq>\<^sub>f m\<^sub>1"
@@ -301,12 +298,12 @@ next
     have "\<dots> = val_map m\<^sub>1 - (val_map m\<^sub>2 + v)"
       by simp
     with fmupd.hyps show ?thesis
-      using val_map_add by (metis fmdom'_notI)
+      using val_map_add by metis
   qed
   finally show ?case .
 qed
 
-lemma fmran_fmmap_const:
+lemma fmran_fmmap_const: (* TODO: Find nicer proofs for SMT calls. *)
   assumes "m \<noteq> {$$}"
   shows "fmran (fmmap (\<lambda>_. v) m) = {|v|}"
   using assms
@@ -319,7 +316,8 @@ next
   proof (cases "m \<noteq> {$$}")
     case True
     have "fmmap (\<lambda>_. v) m(k' $$:= v') = fmmap (\<lambda>_. v) m ++\<^sub>f {k' $$:= v}"
-      by (smt dom_res_singleton dom_res_singleton fmadd_empty(1) fmadd_empty(1) fmadd_empty(2) fmfilter_fmmap fmlookup_map fmmap_add fmupd_alt_def fmupd_lookup option.simps(9))
+      by (smt dom_res_singleton dom_res_singleton fmadd_empty(1) fmadd_empty(1,2) fmfilter_fmmap
+          fmlookup_map fmmap_add fmupd_alt_def fmupd_lookup option.simps(9))
     then have "fmran (fmmap (\<lambda>_. v) m(k' $$:= v')) = fmran (fmmap (\<lambda>_. v) m ++\<^sub>f {k' $$:= v})"
       by simp
     also have "\<dots> = fmran (fmmap (\<lambda>_. v) m) |\<union>| fmran {k' $$:= v}"
@@ -327,7 +325,9 @@ next
       from \<open>m $$ k' = None\<close> have "fmdom (fmmap (\<lambda>_. v) m) |\<inter>| fmdom {k' $$:= v} = {||}"
         by (simp add: fmdom_notI)
       with \<open>m $$ k' = None\<close> show ?thesis
-        by (smt finter_absorb finter_commute finter_funion_distrib2 fmadd_restrict_right_dom fmap_singleton_comm fmdom_add fmdom_map fmdom_notD fmdom_notI fmimage_dom fmimage_union fmran_restrict_fset)
+        by (smt finter_absorb finter_commute finter_funion_distrib2 fmadd_restrict_right_dom
+            fmap_singleton_comm fmdom_add fmdom_map fmdom_notD fmdom_notI fmimage_dom fmimage_union
+            fmran_restrict_fset)
     qed
     also from True and fmupd.IH have "\<dots> = {|v|} |\<union>| fmran {k' $$:= v}"
       by simp
@@ -336,7 +336,8 @@ next
   next
     case False
     then have "fmmap (\<lambda>_. v) m(k' $$:= v') = {k' $$:= v}"
-      by (smt dom_res_singleton dom_res_singleton fmadd_empty(1) fmadd_empty(1) fmadd_empty(2) fmfilter_fmmap fmlookup_map fmmap_add fmupd_alt_def fmupd_lookup option.simps(9))
+      by (smt dom_res_singleton dom_res_singleton fmadd_empty(1,2) fmfilter_fmmap fmlookup_map
+          fmmap_add fmupd_alt_def fmupd_lookup option.simps(9))
     then show ?thesis
       by (simp add: fmran_singleton)
   qed
@@ -373,14 +374,16 @@ qed
 
 \<comment> \<open>NOTE: Lemma 15.7 in the spec.\<close>
 lemma delegs_value_preservation:
-  assumes "(slot, tx) \<turnstile> (rewards, pstate) \<rightarrow>\<^bsub>DELEGS\<^esub>{\<Gamma>} (rewards', pstate)"
-  shows "val_delegs_state (rewards, pstate) =
-         val_delegs_state (rewards', pstate) + wbalance (txwdrls tx)"
+  assumes "
+    (slot, tx) \<turnstile>
+      ((stk_creds, rewards, i\<^sub>r\<^sub>w\<^sub>d), pstate) \<rightarrow>\<^bsub>DELEGS\<^esub>{\<Gamma>} ((stk_creds', rewards', i\<^sub>r\<^sub>w\<^sub>d), pstate)"
+  shows "val_delegs_state ((stk_creds, rewards, i\<^sub>r\<^sub>w\<^sub>d), pstate) =
+         val_delegs_state ((stk_creds', rewards', i\<^sub>r\<^sub>w\<^sub>d), pstate) + wbalance (txwdrls tx)"
   using assms
-proof (induction "(slot, tx)" "(rewards, pstate)" \<Gamma> "(rewards', pstate)" arbitrary: slot tx rewards
-       pstate rewards' rule: delegs_sts.induct)
-  case (seq_delg_base wdrls tx rewards rewards' slot pstate)
-  have "val_delegs_state (rewards, pstate) = val_map rewards"
+proof (induction "(slot, tx)" "((stk_creds, rewards, i\<^sub>r\<^sub>w\<^sub>d), pstate)" \<Gamma> "((stk_creds', rewards', i\<^sub>r\<^sub>w\<^sub>d),
+  pstate)" arbitrary: slot tx stk_creds rewards i\<^sub>r\<^sub>w\<^sub>d stk_creds' rewards' pstate)
+  case (seq_delg_base wdrls tx rewards rewards' slot stk_creds i\<^sub>r\<^sub>w\<^sub>d pstate)
+  have "val_delegs_state ((stk_creds, rewards, i\<^sub>r\<^sub>w\<^sub>d), pstate) = val_map rewards"
     by simp
   also have "\<dots> = val_map wdrls + val_map (rewards --\<^sub>f wdrls)"
     proof -
@@ -403,25 +406,37 @@ proof (induction "(slot, tx)" "(rewards, pstate)" \<Gamma> "(rewards', pstate)" 
       by simp
 next
   case (seq_delg_ind slot tx \<Gamma> dpstate' c)
-  from \<open>slot \<turnstile> dpstate' \<rightarrow>\<^bsub>DELPL\<^esub>{c} (rewards', pstate)\<close> have "snd dpstate' = pstate"
-    using delpl_sts.simps by auto
-  with seq_delg_ind.hyps(2) have "val_delegs_state (rewards, pstate) =
-    val_delegs_state (fst dpstate', pstate) + val_map (txwdrls tx)"
-    by auto
-  moreover have "val_deleg_state (fst dpstate') = val_deleg_state rewards'"
+  have "snd dpstate' = pstate" and "snd (snd (fst dpstate')) = i\<^sub>r\<^sub>w\<^sub>d"
   proof -
-    from \<open>slot \<turnstile> dpstate' \<rightarrow>\<^bsub>DELPL\<^esub>{c} (rewards', pstate)\<close>
-    have "slot \<turnstile> (fst dpstate') \<rightarrow>\<^bsub>DELEG\<^esub>{c} rewards'"
+    from \<open>slot \<turnstile> dpstate' \<rightarrow>\<^bsub>DELPL\<^esub>{c} ((stk_creds', rewards', i\<^sub>r\<^sub>w\<^sub>d), pstate)\<close>
+    show "snd dpstate' = pstate"
       using delpl_sts.simps by auto
-    then show ?thesis
-      using deleg_value_preservation by simp
+  next
+    from \<open>slot \<turnstile> dpstate' \<rightarrow>\<^bsub>DELPL\<^esub>{c} ((stk_creds', rewards', i\<^sub>r\<^sub>w\<^sub>d), pstate)\<close>
+    have "slot \<turnstile> fst dpstate' \<rightarrow>\<^bsub>DELEG\<^esub>{c} (stk_creds', rewards', i\<^sub>r\<^sub>w\<^sub>d)"
+      using delpl_sts.simps by auto
+    then show "snd (snd (fst dpstate')) = i\<^sub>r\<^sub>w\<^sub>d"
+      using deleg_sts.simps by auto
+  qed
+  with seq_delg_ind.hyps(2) have "val_delegs_state ((stk_creds, rewards, i\<^sub>r\<^sub>w\<^sub>d), pstate) =
+    val_delegs_state ((fst (fst dpstate'), fst (snd (fst dpstate')), i\<^sub>r\<^sub>w\<^sub>d), pstate)
+      + val_map (txwdrls tx)"
+    by (metis prod.exhaust_sel)
+  moreover have "val_deleg_state (fst (fst dpstate'), fst (snd (fst dpstate')), i\<^sub>r\<^sub>w\<^sub>d) =
+    val_deleg_state (stk_creds', rewards', i\<^sub>r\<^sub>w\<^sub>d)"
+  proof -
+    from \<open>slot \<turnstile> dpstate' \<rightarrow>\<^bsub>DELPL\<^esub>{c} ((stk_creds', rewards', i\<^sub>r\<^sub>w\<^sub>d), pstate)\<close>
+    have "slot \<turnstile> fst dpstate' \<rightarrow>\<^bsub>DELEG\<^esub>{c} (stk_creds', rewards', i\<^sub>r\<^sub>w\<^sub>d)"
+      using delpl_sts.simps by auto
+    with \<open>snd (snd (fst dpstate')) = i\<^sub>r\<^sub>w\<^sub>d\<close> show ?thesis
+      using deleg_value_preservation by fastforce
   qed
   ultimately show ?case
     by simp
 qed
 
 fun val_poolreap_state :: "pl_reap_state \<Rightarrow> coin" where
-  "val_poolreap_state ((_, deps, _, _), (treasury, _), rewards, _) =
+  "val_poolreap_state ((_, deps, _, _), (treasury, _), (_, rewards, _), _) =
     val_coin deps + val_coin treasury + val_map rewards"
 
 lemma val_map_fmmap_keys:
@@ -433,55 +448,57 @@ proof (induction m\<^sub>2)
   then show ?case
     by auto
 next
-  case (fmupd x y m\<^sub>2)
-  have "val_map (fmmap_keys (\<lambda>k v. v + m\<^sub>1 $$! k) m\<^sub>2(x $$:= y)) =
-    val_map (fmmap_keys (\<lambda>k v. v + m\<^sub>1 $$! k) m\<^sub>2 ++\<^sub>f {x $$:= y + m\<^sub>1 $$! x})"
+  case (fmupd k' v' m\<^sub>2)
+  have "val_map (fmmap_keys (\<lambda>k v. v + m\<^sub>1 $$! k) m\<^sub>2(k' $$:= v')) =
+    val_map (fmmap_keys (\<lambda>k v. v + m\<^sub>1 $$! k) m\<^sub>2 ++\<^sub>f {k' $$:= v' + m\<^sub>1 $$! k'})"
   proof -
-    have "fmmap_keys (\<lambda>k v. v + m\<^sub>1 $$! k) m\<^sub>2(x $$:= y) =
-      fmmap_keys (\<lambda>k v. v + m\<^sub>1 $$! k) m\<^sub>2 ++\<^sub>f {x $$:= y + m\<^sub>1 $$! x}"
+    have "fmmap_keys (\<lambda>k v. v + m\<^sub>1 $$! k) m\<^sub>2(k' $$:= v') =
+      fmmap_keys (\<lambda>k v. v + m\<^sub>1 $$! k) m\<^sub>2 ++\<^sub>f {k' $$:= v' + m\<^sub>1 $$! k'}"
       by transfer' (auto simp add: fmap_ext)
     then show ?thesis
       by simp
   qed
   also have "\<dots> =
-    val_map (fmmap_keys (\<lambda>k v. v + m\<^sub>1 $$! k) m\<^sub>2) + val_map {x $$:= y + m\<^sub>1 $$! x}"
+    val_map (fmmap_keys (\<lambda>k v. v + m\<^sub>1 $$! k) m\<^sub>2) + val_map {k' $$:= v' + m\<^sub>1 $$! k'}"
   proof -
-    from \<open>m\<^sub>2 $$ x = None\<close>
-    have "fmdom' (fmmap_keys (\<lambda>k v. v + m\<^sub>1 $$! k) m\<^sub>2) \<inter> fmdom' {x $$:= y + m\<^sub>1 $$! x} = {}"
+    from \<open>m\<^sub>2 $$ k' = None\<close>
+    have "fmdom' (fmmap_keys (\<lambda>k v. v + m\<^sub>1 $$! k) m\<^sub>2) \<inter> fmdom' {k' $$:= v' + m\<^sub>1 $$! k'} = {}"
       by (simp add: fmdom'_notI)
     then show ?thesis
       using val_map_union by blast
   qed
-  also have "\<dots> = 	val_map (fmmap_keys (\<lambda>k v. v + m\<^sub>1 $$! k) m\<^sub>2) + (y + m\<^sub>1 $$! x)"
+  also have "\<dots> = 	val_map (fmmap_keys (\<lambda>k v. v + m\<^sub>1 $$! k) m\<^sub>2) + (v' + m\<^sub>1 $$! k')"
     by simp
-  also from \<open>fmdom' m\<^sub>2(x $$:= y) \<subseteq> fmdom' m\<^sub>1\<close> and fmupd.IH have "\<dots> =
-    val_map (fmdom' m\<^sub>2 \<lhd> m\<^sub>1) + val_map m\<^sub>2 + (y + m\<^sub>1 $$! x)"
+  also from \<open>fmdom' m\<^sub>2(k' $$:= v') \<subseteq> fmdom' m\<^sub>1\<close> and fmupd.IH have "\<dots> =
+    val_map (fmdom' m\<^sub>2 \<lhd> m\<^sub>1) + val_map m\<^sub>2 + (v' + m\<^sub>1 $$! k')"
     by simp
-  also have "\<dots> = (val_map (fmdom' m\<^sub>2 \<lhd> m\<^sub>1) + m\<^sub>1 $$! x) + (val_map m\<^sub>2 + y)"
+  also have "\<dots> = (val_map (fmdom' m\<^sub>2 \<lhd> m\<^sub>1) + m\<^sub>1 $$! k') + (val_map m\<^sub>2 + v')"
     by simp
-  also have "\<dots> = val_map (fmdom' m\<^sub>2(x $$:= y) \<lhd> m\<^sub>1) + val_map m\<^sub>2(x $$:= y)"
+  also have "\<dots> = val_map (fmdom' m\<^sub>2(k' $$:= v') \<lhd> m\<^sub>1) + val_map m\<^sub>2(k' $$:= v')"
   proof -
-    have "val_map (fmdom' m\<^sub>2 \<lhd> m\<^sub>1) + m\<^sub>1 $$! x = val_map (fmdom' m\<^sub>2(x $$:= y) \<lhd> m\<^sub>1)"
+    have "val_map (fmdom' m\<^sub>2 \<lhd> m\<^sub>1) + m\<^sub>1 $$! k' = val_map (fmdom' m\<^sub>2(k' $$:= v') \<lhd> m\<^sub>1)"
     proof -
-      from \<open>m\<^sub>2 $$ x = None\<close> have "val_map (fmdom' m\<^sub>2(x $$:= y) \<lhd> m\<^sub>1) = val_map ((fmdom' m\<^sub>2 \<union> {x}) \<lhd> m\<^sub>1)"
+      from \<open>m\<^sub>2 $$ k' = None\<close>
+      have "val_map (fmdom' m\<^sub>2(k' $$:= v') \<lhd> m\<^sub>1) = val_map ((fmdom' m\<^sub>2 \<union> {k'}) \<lhd> m\<^sub>1)"
         by simp
-      also have "\<dots> = val_map ((fmdom' m\<^sub>2 \<lhd> m\<^sub>1) ++\<^sub>f ({x} \<lhd> m\<^sub>1))"
+      also have "\<dots> = val_map ((fmdom' m\<^sub>2 \<lhd> m\<^sub>1) ++\<^sub>f ({k'} \<lhd> m\<^sub>1))"
         using dom_res_union_distr by metis
-      also have "\<dots> = val_map (fmdom' m\<^sub>2 \<lhd> m\<^sub>1) + val_map ({x} \<lhd> m\<^sub>1)"
+      also have "\<dots> = val_map (fmdom' m\<^sub>2 \<lhd> m\<^sub>1) + val_map ({k'} \<lhd> m\<^sub>1)"
       proof -
-        from \<open>fmdom' m\<^sub>2(x $$:= y) \<subseteq> fmdom' m\<^sub>1\<close> have "fmdom' (fmdom' m\<^sub>2 \<lhd> m\<^sub>1) = fmdom' m\<^sub>2"
+        from \<open>fmdom' m\<^sub>2(k' $$:= v') \<subseteq> fmdom' m\<^sub>1\<close> have "fmdom' (fmdom' m\<^sub>2 \<lhd> m\<^sub>1) = fmdom' m\<^sub>2"
           by (auto simp add: fmfilter_alt_defs(4))
-        moreover from \<open>fmdom' m\<^sub>2(x $$:= y) \<subseteq> fmdom' m\<^sub>1\<close> have "fmdom' ({x} \<lhd> m\<^sub>1) = {x}"
+        moreover from \<open>fmdom' m\<^sub>2(k' $$:= v') \<subseteq> fmdom' m\<^sub>1\<close> have "fmdom' ({k'} \<lhd> m\<^sub>1) = {k'}"
           by (auto simp add: equalityI)
-        ultimately have "fmdom' (fmdom' m\<^sub>2 \<lhd> m\<^sub>1) \<inter> fmdom' ({x} \<lhd> m\<^sub>1) = {}"
-          using \<open>m\<^sub>2 $$ x = None\<close> by (simp add: fmdom'_notI)
+        ultimately have "fmdom' (fmdom' m\<^sub>2 \<lhd> m\<^sub>1) \<inter> fmdom' ({k'} \<lhd> m\<^sub>1) = {}"
+          using \<open>m\<^sub>2 $$ k' = None\<close> by (simp add: fmdom'_notI)
         then show ?thesis
           using val_map_union by blast
       qed
-      also have "\<dots> = val_map (fmdom' m\<^sub>2 \<lhd> m\<^sub>1) + m\<^sub>1 $$! x"
+      also have "\<dots> = val_map (fmdom' m\<^sub>2 \<lhd> m\<^sub>1) + m\<^sub>1 $$! k'"
       proof -
-        from \<open>fmdom' m\<^sub>2(x $$:= y) \<subseteq> fmdom' m\<^sub>1\<close> have "x \<in> fmdom' m\<^sub>1" by simp
-        then have "fmdom' ({x} \<lhd> m\<^sub>1) = {x}"
+        from \<open>fmdom' m\<^sub>2(k' $$:= v') \<subseteq> fmdom' m\<^sub>1\<close> have "k' \<in> fmdom' m\<^sub>1"
+          by simp
+        then have "fmdom' ({k'} \<lhd> m\<^sub>1) = {k'}"
           by (auto simp add: equalityI)
         then show ?thesis
           by simp
@@ -489,8 +506,8 @@ next
       finally show ?thesis
         by simp
     qed
-    moreover from \<open>m\<^sub>2 $$ x = None\<close> have "val_map m\<^sub>2(x $$:= y) = val_map m\<^sub>2 + y"
-      using val_map_add by (metis fmdom'_notI)
+    moreover from \<open>m\<^sub>2 $$ k' = None\<close> have "val_map m\<^sub>2(k' $$:= v') = val_map m\<^sub>2 + v'"
+      using val_map_add by metis
     ultimately show ?thesis
       by linarith
   qed
@@ -531,7 +548,7 @@ proof -
   from assms show ?thesis
   proof cases
     case (pool_reap reward_acnts' refunds rewards m_refunds refunded unclaimed utxo deps fees ups
-          treasury reserves pstate)
+      treasury reserves stk_creds i\<^sub>r\<^sub>w\<^sub>d pstate)
     from pool_reap(2) have "val_poolreap_state s' =
       deps - (unclaimed + refunded) + treasury + unclaimed + val_map (rewards \<union>\<^sub>+ refunds)"
       by simp
@@ -567,9 +584,265 @@ proof -
         by linarith
     qed
     finally show ?thesis
-      using \<open>s = ((utxo, deps, fees, ups), (treasury, reserves), rewards, pstate)\<close> and
-        \<open>refunded = val_map refunds\<close> by simp
+      using \<open>s = ((utxo, deps, fees, ups), (treasury, reserves), (stk_creds, rewards, i\<^sub>r\<^sub>w\<^sub>d), pstate)\<close>
+        and \<open>refunded = val_map refunds\<close> by simp
   qed
+qed
+
+fun val_epoch_state :: "epoch_state \<Rightarrow> coin" where
+  "val_epoch_state ((treasury, reserves), _, ((_, _, fees, _), ((_, rewards, _), _)), _) =
+    val_coin treasury + val_coin reserves + val_coin fees + val_map rewards"
+
+lemma val_map_union_plus: (* TODO: Find nicer proofs for SMT calls. *)
+  shows "val_map (m\<^sub>1 \<union>\<^sub>+ m\<^sub>2) = val_map m\<^sub>1 + val_map m\<^sub>2"
+proof (induction m\<^sub>1)
+  case fmempty
+  have "fmdom' m\<^sub>2 \<lhd>/ {$$} = {$$}"
+    by simp
+  moreover have "fmdom' {$$} \<lhd>/ m\<^sub>2 = m\<^sub>2"
+    by simp
+  moreover have "{$$} \<inter>\<^sub>+ m\<^sub>2 = {$$}"
+    by (simp add: fmap_ext)
+  moreover have "val_map {$$} = 0"
+    by simp
+  ultimately show ?case
+    by simp
+next
+  case (fmupd k v m\<^sub>1)
+  then show ?case
+  proof (cases "m\<^sub>2 $$ k = None")
+    case True
+    from fmupd.hyps and True have "val_map (m\<^sub>1(k $$:= v) \<union>\<^sub>+ m\<^sub>2) = val_map ((m\<^sub>1 \<union>\<^sub>+ m\<^sub>2) ++\<^sub>f {k $$:= v})"
+      using union_plus_addition_notin by metis
+    also have "\<dots> = val_map (m\<^sub>1 \<union>\<^sub>+ m\<^sub>2) + val_map {k $$:= v}"
+    proof -
+      from fmupd.hyps and True have "fmdom' (m\<^sub>1 \<union>\<^sub>+ m\<^sub>2) \<inter> fmdom' {k $$:= v} = {}"
+        by (simp add: fmdom'_notI)
+      then show ?thesis
+        using val_map_union by fast
+    qed
+    also from fmupd.IH have "\<dots> = val_map m\<^sub>1 + val_map m\<^sub>2 + val_map {k $$:= v}"
+      by simp
+    finally show ?thesis
+      using val_map_add and fmupd.hyps by (smt fmdom'_empty fmempty_lookup sum.cong sum.empty)
+  next
+    case False
+    from False obtain v' where *: "m\<^sub>2 $$ k = Some v'"
+      by auto
+    from False have "val_map (m\<^sub>1(k $$:= v) \<union>\<^sub>+ m\<^sub>2) =
+      val_map (fmdom' m\<^sub>2 \<lhd>/ m\<^sub>1 ++\<^sub>f fmdom' m\<^sub>1(k $$:= v) \<lhd>/ m\<^sub>2 ++\<^sub>f (m\<^sub>1(k $$:= v) \<inter>\<^sub>+ m\<^sub>2))"
+      by auto
+    also from fmupd.hyps and * have "\<dots> =
+      val_map (fmdom' m\<^sub>2 \<lhd>/ m\<^sub>1 ++\<^sub>f (fmdom' m\<^sub>1 \<lhd>/ m\<^sub>2 --\<^sub>f {k $$:= v'}) ++\<^sub>f (m\<^sub>1(k $$:= v) \<inter>\<^sub>+ m\<^sub>2))"
+      by simp
+    also have "\<dots> =
+      val_map (fmdom' m\<^sub>2 \<lhd>/ m\<^sub>1 ++\<^sub>f (fmdom' m\<^sub>1 \<lhd>/ m\<^sub>2 --\<^sub>f {k $$:= v'}) ++\<^sub>f (m\<^sub>1 \<inter>\<^sub>+ m\<^sub>2)
+        ++\<^sub>f {k $$:= v' + v})"
+    proof -
+      from \<open>m\<^sub>1 $$ k = None\<close> and * have "m\<^sub>1(k $$:= v) \<inter>\<^sub>+ m\<^sub>2 = (m\<^sub>1 \<inter>\<^sub>+ m\<^sub>2) ++\<^sub>f {k $$:= v' + v}"
+        using inter_plus_addition_in by simp
+      then show ?thesis
+        by auto
+    qed
+    also have "\<dots> = val_map ((fmdom' m\<^sub>2 \<lhd>/ m\<^sub>1 ++\<^sub>f fmdom' m\<^sub>1 \<lhd>/ m\<^sub>2) --\<^sub>f {k $$:= v'} ++\<^sub>f (m\<^sub>1 \<inter>\<^sub>+ m\<^sub>2)
+      ++\<^sub>f {k $$:= v' + v})"
+    proof -
+      from False have "fmdom' m\<^sub>2 \<lhd>/ m\<^sub>1 ++\<^sub>f (fmdom' m\<^sub>1 \<lhd>/ m\<^sub>2 --\<^sub>f {k $$:= v'}) =
+        (fmdom' m\<^sub>2 \<lhd>/ m\<^sub>1 ++\<^sub>f fmdom' m\<^sub>1 \<lhd>/ m\<^sub>2) --\<^sub>f {k $$:= v'}"
+        by (smt fmdom'_empty fmdom'_fmupd fmdom'_notD fmfilter_add_distrib fmfilter_true
+            fmlookup_filter option.distinct(1) singletonD)
+      then show ?thesis
+        by auto
+    qed
+    also have "\<dots> = val_map ((fmdom' m\<^sub>2 \<lhd>/ m\<^sub>1 ++\<^sub>f fmdom' m\<^sub>1 \<lhd>/ m\<^sub>2 ++\<^sub>f (m\<^sub>1 \<inter>\<^sub>+ m\<^sub>2)) --\<^sub>f {k $$:= v'}
+      ++\<^sub>f {k $$:= v' + v})"
+    proof -
+      from fmupd.hyps have "(fmdom' m\<^sub>2 \<lhd>/ m\<^sub>1 ++\<^sub>f fmdom' m\<^sub>1 \<lhd>/ m\<^sub>2) --\<^sub>f {k $$:= v'} ++\<^sub>f (m\<^sub>1 \<inter>\<^sub>+ m\<^sub>2) =
+        (fmdom' m\<^sub>2 \<lhd>/ m\<^sub>1 ++\<^sub>f fmdom' m\<^sub>1 \<lhd>/ m\<^sub>2) ++\<^sub>f (m\<^sub>1 \<inter>\<^sub>+ m\<^sub>2) --\<^sub>f {k $$:= v'}"
+        by (smt fmdom'_empty fmdom'_fmupd fmdom'_notI fmfilter_add_distrib fmfilter_fmmap_keys
+            fmfilter_true fmlookup_filter option.distinct(1) singletonD)
+      then show ?thesis
+        by auto
+    qed
+    also have "\<dots> = val_map ((m\<^sub>1 \<union>\<^sub>+ m\<^sub>2) --\<^sub>f {k $$:= v'}) + val_map {k $$:= v' + v}"
+    proof -
+      have "fmdom' ((m\<^sub>1 \<union>\<^sub>+ m\<^sub>2) --\<^sub>f {k $$:= v'}) \<inter> fmdom' {k $$:= v' + v} = {}"
+        by (simp add: fmdom'_notI)
+      then show ?thesis
+        using val_map_union by fast
+    qed
+    also have "\<dots> = val_map (m\<^sub>1 \<union>\<^sub>+ m\<^sub>2) - val_map {k $$:= v'} + val_map {k $$:= v' + v}"
+    proof -
+      from * and fmupd.hyps have "{k $$:= v'} \<subseteq>\<^sub>f fmdom' m\<^sub>1 \<lhd>/ m\<^sub>2"
+        by (simp add: fmdom'_notI fmpred_upd fmsubset_alt_def)
+      moreover have "(m\<^sub>1 \<inter>\<^sub>+ m\<^sub>2) $$ k = None"
+        by (simp add: fmdom'_notI fmupd.hyps)
+      ultimately have "{k $$:= v'} \<subseteq>\<^sub>f m\<^sub>1 \<union>\<^sub>+ m\<^sub>2"
+        using * and fmdiff_partition
+        by (smt Un_iff domIff dom_fmlookup fmdom'_add fmdom'_empty fmdom'_fmupd fmlookup_add
+            fmlookup_filter fmpred_empty fmpred_upd fmsubset_alt_def singletonI)
+      then show ?thesis
+        using val_map_minus by metis
+    qed
+    also have "\<dots> = val_map (m\<^sub>1 \<union>\<^sub>+ m\<^sub>2) - v' + v' + v"
+      by simp
+    also from fmupd.IH have "\<dots> = val_map m\<^sub>1 + val_map m\<^sub>2 + v"
+      by simp
+    finally show ?thesis
+      using \<open>m\<^sub>1 $$ k = None\<close> and val_map_add by (smt sum.cong)
+  qed
+qed
+
+lemma val_map_fmap_of_list:
+  fixes m :: "('a::linorder, coin) fmap" and f :: "'a::linorder \<Rightarrow> 'b::linorder"
+  assumes "inj f"
+  and "mono f"
+  shows "val_map (fmap_of_list [(f k, v). (k, v) \<leftarrow> sorted_list_of_fmap m]) = val_map m"
+  using assms
+proof (induction m)
+  case fmempty
+  then show ?case
+    unfolding sorted_list_of_fmap_def and sorted_list_of_fset_def by simp
+next
+  case (fmupd k v m)
+  let ?g = "\<lambda>(k, v). (f k, v)"
+  from \<open>m $$ k = None\<close> and assms(1,2)
+  have "val_map (fmap_of_list (map ?g (sorted_list_of_fmap m(k $$:= v)))) =
+    val_map ((fmap_of_list (map ?g (sorted_list_of_fmap m)))(f k $$:= v))"
+    by (simp add: fmap_of_list_sorted_list_of_fmap)
+  also have "\<dots> = val_map (fmap_of_list (map ?g (sorted_list_of_fmap m))) + v"
+  proof -
+    have "(fmap_of_list (map ?g (sorted_list_of_fmap m))) $$ (f k) = None"
+    proof -
+      from \<open>m $$ k = None\<close> have "k \<notin> set (map fst (sorted_list_of_fmap m))"
+        by (metis domIff dom_map_of_conv_image_fst map_of_sorted_list set_map)
+      with assms(1) have "f k \<notin> set (map fst (map ?g (sorted_list_of_fmap m)))"
+        using map_inj_pair_non_membership by simp
+      then show ?thesis
+        by (metis fmlookup_of_list map_of_eq_None_iff set_map)
+    qed
+    then show ?thesis
+      using val_map_add by force
+  qed
+  also from assms(1,2) and fmupd.IH have "\<dots> = val_map m + v"
+    by simp
+  finally show ?case
+    by (metis fmupd.hyps val_map_add)
+qed
+
+\<comment> \<open>NOTE: Lemma 15.9 in the spec.\<close>
+\<comment> \<open>NOTE: We require \<open>addr_rwd\<close> to be monotonic, which is a minor deviation from the spec.\<close>
+lemma reward_update_value_preservation:
+  assumes "inj addr_rwd"
+  and "mono addr_rwd"
+  shows "val_epoch_state s = val_epoch_state (apply_r_upd (create_r_upd b s) s)"
+proof -
+  obtain treasury reserves ss utxo deps fees up stk_creds rewards i\<^sub>r\<^sub>w\<^sub>d pstate ppm
+    where f1: "s =
+      (
+        (treasury, reserves),
+        ss,
+        ((utxo, deps, fees, up), ((stk_creds, rewards, i\<^sub>r\<^sub>w\<^sub>d), pstate)),
+        ppm
+      )"
+    using val_epoch_state.cases by blast
+  moreover obtain \<Delta>t \<Delta>r rs \<Delta>f rew\<^sub>m\<^sub>i\<^sub>r where f2: "create_r_upd b s = (\<Delta>t, \<Delta>r, rs, \<Delta>f, rew\<^sub>m\<^sub>i\<^sub>r)"
+    using prod_cases5 by blast
+  ultimately obtain non_distributed and rew'\<^sub>m\<^sub>i\<^sub>r and update\<^sub>r\<^sub>w\<^sub>d and unregistered
+    where f3: "apply_r_upd (\<Delta>t, \<Delta>r, rs, \<Delta>f, rew\<^sub>m\<^sub>i\<^sub>r) s =
+      (
+        (treasury + \<Delta>t, reserves + \<Delta>r + non_distributed),
+        ss,
+        ((utxo, deps, fees + \<Delta>f, up), ((stk_creds, (rewards \<union>\<^sub>+ rs) \<union>\<^sub>+ update\<^sub>r\<^sub>w\<^sub>d, {$$}), pstate)),
+        ppm
+      )"
+      and f4: "non_distributed =
+        (\<Sum>k \<in> fmdom' (fmdom' stk_creds \<lhd>/ rew\<^sub>m\<^sub>i\<^sub>r). (fmdom' stk_creds \<lhd>/ rew\<^sub>m\<^sub>i\<^sub>r) $$! k)"
+      and f5: "rew'\<^sub>m\<^sub>i\<^sub>r = fmdom' stk_creds \<lhd> rew\<^sub>m\<^sub>i\<^sub>r"
+      and f6: "update\<^sub>r\<^sub>w\<^sub>d = fmap_of_list [(addr_rwd hk, val). (hk, val) \<leftarrow> sorted_list_of_fmap rew'\<^sub>m\<^sub>i\<^sub>r]"
+      and f7: "unregistered = fmdom' stk_creds \<lhd>/ rew\<^sub>m\<^sub>i\<^sub>r"
+    by (metis apply_r_upd.simps)
+  then have "val_epoch_state (apply_r_upd (create_r_upd b s) s) =
+    treasury + reserves + fees + val_map rewards + \<Delta>t + \<Delta>r + non_distributed + \<Delta>f + val_map rs
+    + val_map update\<^sub>r\<^sub>w\<^sub>d"
+  proof -
+    from f2 and f3 have "val_epoch_state (apply_r_upd (create_r_upd b s) s) =
+      (treasury + \<Delta>t) + (reserves + \<Delta>r + non_distributed) + (fees + \<Delta>f)
+      + val_map ((rewards \<union>\<^sub>+ rs) \<union>\<^sub>+ update\<^sub>r\<^sub>w\<^sub>d)"
+      using val_coin.simps and val_epoch_state.simps by presburger
+    moreover have "val_map ((rewards \<union>\<^sub>+ rs) \<union>\<^sub>+ update\<^sub>r\<^sub>w\<^sub>d) =
+      val_map rewards + val_map rs + val_map update\<^sub>r\<^sub>w\<^sub>d"
+      using val_map_union_plus by metis
+    ultimately show ?thesis
+      by linarith
+  qed
+  moreover have "\<Delta>t + \<Delta>r + non_distributed + \<Delta>f + val_map rs + val_map update\<^sub>r\<^sub>w\<^sub>d = 0"
+  proof (cases ss)
+    case (fields pstake\<^sub>m\<^sub>a\<^sub>r\<^sub>k pstake\<^sub>s\<^sub>e\<^sub>t pstake\<^sub>g\<^sub>o pools_ss fee_ss)
+    from f1 and fields have "s =
+      (
+        (treasury, reserves),
+        (pstake\<^sub>m\<^sub>a\<^sub>r\<^sub>k, pstake\<^sub>s\<^sub>e\<^sub>t, pstake\<^sub>g\<^sub>o, pools_ss, fee_ss),
+        ((utxo, deps, fees, up), (stk_creds, rewards, i\<^sub>r\<^sub>w\<^sub>d), pstate),
+        ppm
+      )"
+      by simp
+    then obtain \<Delta>t\<^sub>1 \<Delta>t\<^sub>2 \<Delta>r' \<Delta>r\<^sub>l rs' rewards\<^sub>m\<^sub>i\<^sub>r registered unregistered' reward_pot R
+      where "create_r_upd b s = (\<Delta>t\<^sub>1 + \<Delta>t\<^sub>2, -\<Delta>r', rs', -fee_ss, registered)"
+      and "unregistered' = fmdom' stk_creds \<lhd>/ i\<^sub>r\<^sub>w\<^sub>d"
+      and "registered = i\<^sub>r\<^sub>w\<^sub>d --\<^sub>f unregistered'"
+      and "rewards\<^sub>m\<^sub>i\<^sub>r = (\<Sum> k \<in> fmdom' registered. registered $$! k)"
+      and "reward_pot = fee_ss + \<Delta>r\<^sub>l"
+      and "R = reward_pot - \<Delta>t\<^sub>1"
+      and "\<Delta>t\<^sub>2 = R - (\<Sum> k \<in> fmdom' rs'. rs' $$! k)"
+      and "\<Delta>r' = \<Delta>r\<^sub>l + rewards\<^sub>m\<^sub>i\<^sub>r"
+      by (metis create_r_upd.simps prod.exhaust_sel that)
+    with f1 and f2 and fields have "rs' = rs" and "\<Delta>r' = -\<Delta>r" and "\<Delta>t = \<Delta>t\<^sub>1 + \<Delta>t\<^sub>2"
+      and "\<Delta>f = -fee_ss" and "registered = rew\<^sub>m\<^sub>i\<^sub>r"
+      by auto
+    with \<open>R = reward_pot - \<Delta>t\<^sub>1\<close> and \<open>\<Delta>t\<^sub>2 = R - val_map rs'\<close> and \<open>reward_pot = fee_ss + \<Delta>r\<^sub>l\<close>
+    have "\<Delta>t\<^sub>1 + \<Delta>t\<^sub>2 - \<Delta>r\<^sub>l + val_map rs - fee_ss = 0"
+      by simp
+    from \<open>\<Delta>t = \<Delta>t\<^sub>1 + \<Delta>t\<^sub>2\<close> have "\<Delta>t + \<Delta>r + non_distributed + \<Delta>f + val_map rs + val_map update\<^sub>r\<^sub>w\<^sub>d =
+      \<Delta>t\<^sub>1 + \<Delta>t\<^sub>2 + \<Delta>r + non_distributed + \<Delta>f + val_map rs + val_map update\<^sub>r\<^sub>w\<^sub>d"
+      by simp
+    also from \<open>\<Delta>r' = \<Delta>r\<^sub>l + rewards\<^sub>m\<^sub>i\<^sub>r\<close> and \<open>\<Delta>r' = -\<Delta>r\<close> and \<open>rewards\<^sub>m\<^sub>i\<^sub>r = val_map registered\<close>
+    have "\<dots> = \<Delta>t\<^sub>1 + \<Delta>t\<^sub>2 - \<Delta>r\<^sub>l - val_map registered + non_distributed + \<Delta>f + val_map rs
+      + val_map update\<^sub>r\<^sub>w\<^sub>d"
+      by simp
+    also from \<open>\<Delta>f = -fee_ss\<close> have "\<dots> = \<Delta>t\<^sub>1 + \<Delta>t\<^sub>2 - \<Delta>r\<^sub>l + val_map rs - fee_ss - val_map registered
+      + non_distributed + val_map update\<^sub>r\<^sub>w\<^sub>d"
+      by simp
+    also from \<open>\<Delta>t\<^sub>1 + \<Delta>t\<^sub>2 - \<Delta>r\<^sub>l + val_map rs - fee_ss = 0\<close> have "\<dots> =
+      - val_map registered + non_distributed + val_map update\<^sub>r\<^sub>w\<^sub>d"
+      by simp
+    also have "\<dots> = 0"
+    proof -
+      have "val_map registered = val_map update\<^sub>r\<^sub>w\<^sub>d + non_distributed"
+      proof -
+        from f6 and assms(1,2) have "val_map rew'\<^sub>m\<^sub>i\<^sub>r = val_map update\<^sub>r\<^sub>w\<^sub>d"
+          by (simp add: val_map_fmap_of_list)
+        moreover from f4 and f7 have "val_map unregistered = non_distributed"
+          by simp
+        ultimately have *: "val_map rew'\<^sub>m\<^sub>i\<^sub>r + val_map unregistered =
+          val_map update\<^sub>r\<^sub>w\<^sub>d + non_distributed"
+          by simp
+        from \<open>registered = rew\<^sub>m\<^sub>i\<^sub>r\<close> have "val_map registered = val_map rew\<^sub>m\<^sub>i\<^sub>r"
+          by simp
+        also from f5 and f7 have "\<dots> = val_map rew'\<^sub>m\<^sub>i\<^sub>r + val_map unregistered"
+          using val_map_split by (metis add.commute)
+        finally show ?thesis
+          using * by simp
+      qed
+      then show ?thesis
+        by simp
+  qed
+    finally show ?thesis .
+  qed
+  moreover have "val_epoch_state s = treasury + reserves + fees + val_map rewards"
+    using f1 by simp
+  ultimately show ?thesis
+    by simp
 qed
 
 end

@@ -15,6 +15,7 @@ session Shelley (ledgerformalization) = HOL +
     UTxO
     Delegation_Certificates
     Delegation
+    Ledger
     Rewards
     Properties
   document_files
