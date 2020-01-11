@@ -845,4 +845,24 @@ proof -
     by simp
 qed
 
+fun val_utxow_state :: "utxo_state \<Rightarrow> coin" where
+  "val_utxow_state s = val_utxo_state s"
+
+lemma utxow_value_preservation:
+  assumes "e \<turnstile> s \<rightarrow>\<^bsub>UTXOW\<^esub>{tx} s'"
+  shows "val_utxow_state s + wbalance (txwdrls tx) = val_utxow_state s'"
+proof -
+  from assms show ?thesis
+  proof cases
+    case utxo_wit
+    from \<open>e \<turnstile> s \<rightarrow>\<^bsub>UTXO\<^esub>{tx} s'\<close> have "val_utxo_state s + wbalance (txwdrls tx) = val_utxo_state s'"
+      using utxo_value_preservation by simp
+    then have "val_utxow_state s' = val_utxow_state s + wbalance (txwdrls tx)"
+      using val_utxow_state.simps by simp
+    then show ?thesis ..
+  qed
+qed
+
+
+
 end

@@ -126,4 +126,18 @@ inductive utxo_sts :: "utxo_env \<Rightarrow> utxo_state \<Rightarrow> tx \<Righ
       and "deposit_change = deposits pp stpools (txcerts tx) - (refunded + decayed)"
       and "(slot, pp, gen_delegs) \<turnstile> ups \<rightarrow>\<^bsub>UP\<^esub>{txup tx} ups'"
 
+subsection \<open>Witnesses\<close>
+
+text \<open> UTxO with witnesses inference rules \<close>
+
+text \<open>
+  NOTE:
+  \<^item> The validation preconditions in the spec are no needed for now.
+\<close>
+inductive utxow_sts :: "utxo_env \<Rightarrow> utxo_state \<Rightarrow> tx \<Rightarrow> utxo_state \<Rightarrow> bool"
+  (\<open>_ \<turnstile> _ \<rightarrow>\<^bsub>UTXOW\<^esub>{_} _\<close> [51, 0, 51] 50)
+  where
+    utxo_wit: "\<Gamma> \<turnstile> s \<rightarrow>\<^bsub>UTXOW\<^esub>{tx} s'"
+      if "\<Gamma> \<turnstile> s \<rightarrow>\<^bsub>UTXO\<^esub>{tx} s'"
+
 end
