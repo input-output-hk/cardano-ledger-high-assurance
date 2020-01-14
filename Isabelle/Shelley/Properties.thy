@@ -1,7 +1,7 @@
 section \<open> Properties \<close>
 
 theory Properties
-  imports UTxO Delegation Rewards
+  imports UTxO Delegation Rewards Ledger
 begin
 
 subsection \<open> Preservation of Value \<close>
@@ -851,6 +851,27 @@ proof -
     then have "val_utxow_state s' = val_utxow_state s + wbalance (txwdrls tx)"
       using val_utxow_state.simps by simp
     then show ?thesis ..
+  qed
+qed
+
+fun val_ledger_state :: "l_state \<Rightarrow> coin" where
+  "val_ledger_state (utxo_st, dpstate) = val_utxo_state utxo_st + val_delegs_state dpstate"
+
+lemma ledger_value_preservation:
+  assumes "e \<turnstile> s \<rightarrow>\<^bsub>LEDGER\<^esub>{tx} s'"
+  shows "val_ledger_state s = val_ledger_state s'"
+proof -
+  from assms show ?thesis
+  proof cases
+    case (ledger slot dpstate dpstate' pp utxo_st utxo_st' tx_ix reserves)
+    from \<open>(slot, pp, undefined, undefined, undefined) \<turnstile> utxo_st \<rightarrow>\<^bsub>UTXOW\<^esub>{tx} utxo_st'\<close>
+    have "val_utxo_state utxo_st' = val_utxo_state utxo_st + wbalance (txwdrls tx)"
+      using utxow_value_preservation by simp
+    moreover from \<open>(slot, tx) \<turnstile> dpstate \<rightarrow>\<^bsub>DELEGS\<^esub>{txcerts tx} dpstate'\<close>
+    have "val_delegs_state dpstate = val_delegs_state dpstate' + wbalance (txwdrls tx)"
+      using delegs_value_preservation by simp
+    ultimately show ?thesis using val_ledger_state.simps
+      by (simp add: \<open>s = (utxo_st, dpstate)\<close> \<open>s' = (utxo_st', dpstate')\<close>) 
   qed
 qed
 
