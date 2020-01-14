@@ -382,9 +382,9 @@ proof (induction \<Gamma> arbitrary: s' rule: rev_induct)
   from \<open>(slot, tx) \<turnstile> s \<rightarrow>\<^bsub>DELEGS\<^esub>{[]} s'\<close> show ?case
   proof cases
     case (seq_delg_base wdrls rewards rewards' stk_creds i\<^sub>r\<^sub>w\<^sub>d pstate)
-  from \<open>s = ((stk_creds, rewards, i\<^sub>r\<^sub>w\<^sub>d), pstate)\<close> have "val_delegs_state s = val_map rewards"
-    by simp
-  also have "\<dots> = val_map wdrls + val_map (rewards --\<^sub>f wdrls)"
+    from \<open>s = ((stk_creds, rewards, i\<^sub>r\<^sub>w\<^sub>d), pstate)\<close> have "val_delegs_state s = val_map rewards"
+      by simp
+    also have "\<dots> = val_map wdrls + val_map (rewards --\<^sub>f wdrls)"
     proof -
       from \<open>wdrls \<subseteq>\<^sub>f rewards\<close> have "rewards = wdrls ++\<^sub>f (rewards --\<^sub>f wdrls)"
         by (simp add: fmdiff_partition)
@@ -872,6 +872,37 @@ proof -
       using delegs_value_preservation by simp
     ultimately show ?thesis using val_ledger_state.simps
       by (simp add: \<open>s = (utxo_st, dpstate)\<close> \<open>s' = (utxo_st', dpstate')\<close>) 
+  qed
+qed
+
+fun val_ledgers_state :: "l_state \<Rightarrow> coin" where
+  "val_ledgers_state ls = val_ledger_state ls"
+
+lemma ledgers_value_preservation:
+  assumes "e \<turnstile> s \<rightarrow>\<^bsub>LEDGERS\<^esub>{\<Gamma>} s'"
+  shows "val_ledgers_state s = val_ledgers_state s'"
+  using assms
+proof (induction \<Gamma> arbitrary: s' rule: rev_induct)
+  case Nil
+  from \<open>e \<turnstile> s \<rightarrow>\<^bsub>LEDGERS\<^esub>{[]} s'\<close> show ?case
+    by cases simp_all
+next
+  case (snoc c \<Gamma>)
+  from \<open>e \<turnstile> s \<rightarrow>\<^bsub>LEDGERS\<^esub>{\<Gamma> @ [c]} s'\<close> show ?case
+  proof cases
+    case seq_ledger_base
+    then show ?thesis
+      by simp
+  next
+    case (seq_ledger_ind slot pp reserves \<Gamma>' s'' c')
+    from \<open>(slot, pp, reserves) \<turnstile> s \<rightarrow>\<^bsub>LEDGERS\<^esub>{\<Gamma>'} s''\<close> and snoc.IH and \<open>e = (slot, pp, reserves)\<close>
+      and \<open>\<Gamma> @ [c] = \<Gamma>' @ [c']\<close> have "val_ledgers_state s = val_ledgers_state s''"
+      by simp
+    moreover from \<open>(slot, length \<Gamma>' - 1, pp, reserves) \<turnstile> s'' \<rightarrow>\<^bsub>LEDGER\<^esub>{c'} s'\<close>
+    have "val_ledger_state s'' = val_ledger_state s'"
+      using ledger_value_preservation by simp
+    ultimately show ?thesis
+      by simp
   qed
 qed
 
