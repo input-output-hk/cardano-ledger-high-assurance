@@ -132,7 +132,7 @@ text \<open> UTxO with witnesses inference rules \<close>
 
 text \<open>
   NOTE:
-  \<^item> The validation preconditions in the spec are no needed for now.
+  \<^item> The validation preconditions in the spec are not needed for now.
 \<close>
 inductive utxow_sts :: "utxo_env \<Rightarrow> utxo_state \<Rightarrow> tx \<Rightarrow> utxo_state \<Rightarrow> bool"
   (\<open>_ \<turnstile> _ \<rightarrow>\<^bsub>UTXOW\<^esub>{_} _\<close> [51, 0, 51] 50)
