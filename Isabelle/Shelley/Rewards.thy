@@ -22,6 +22,13 @@ type_synonym stake = "(key_hash, coin) fmap"
 
 subsection \<open> Snapshot Transition \<close>
 
+text \<open> Snapshots environment \<close>
+
+type_synonym snapshot_env = "
+  p_params \<times> \<comment> \<open>protocol parameters\<close>
+  d_state \<times> \<comment> \<open>delegation state\<close>
+  p_state \<comment> \<open>pool state\<close>"
+
 text \<open> Snapshots \<close>
 
 type_synonym snapshots = "
@@ -30,6 +37,38 @@ type_synonym snapshots = "
   (stake \<times> (key_hash, key_hash) fmap) \<times> \<comment> \<open>oldest stake\<close>
   (key_hash, pool_param) fmap \<times> \<comment> \<open>pool parameters\<close>
   coin \<comment> \<open>fee snapshot\<close>"
+
+text \<open> Snapshots states \<close>
+
+type_synonym snapshot_state = "
+  snapshots \<times> \<comment> \<open>snapshots\<close>
+  utxo_state \<comment> \<open>utxo state\<close>"
+
+text \<open> Snapshot Inference Rule \<close>
+
+text \<open>
+  NOTE:
+  \<^item> \<open>stake\<close>, \<open>delegations\<close> and \<open>oblg\<close> are not defined since they are not related to the
+    "preservation of value" property.
+\<close>
+inductive snap_sts :: "snapshot_env \<Rightarrow> snapshot_state \<Rightarrow> epoch \<Rightarrow> snapshot_state \<Rightarrow> bool"
+  (\<open>_ \<turnstile> _ \<rightarrow>\<^bsub>SNAP\<^esub>{_} _\<close> [51, 0, 51] 50)
+  where
+    snapshot: "
+      (pp, dstate, pstate) \<turnstile>
+        (
+          (pstake\<^sub>m\<^sub>a\<^sub>r\<^sub>k, pstake\<^sub>s\<^sub>e\<^sub>t, pstake\<^sub>g\<^sub>o, pools_ss, fee_ss),
+          (utxo, deps, fees, up)
+        )
+        \<rightarrow>\<^bsub>SNAP\<^esub>{e}
+        (
+          ((stake, delegations), pstake\<^sub>m\<^sub>a\<^sub>r\<^sub>k, pstake\<^sub>s\<^sub>e\<^sub>t, pools_params, fees + decayed),
+          (utxo, oblg, fees + decayed, up)
+        )"
+      if "stake = undefined"
+      and "delegations = undefined"
+      and "oblg = undefined"
+      and "decayed = deps - oblg"
 
 subsection \<open> Pool Reaping Transition \<close>
 

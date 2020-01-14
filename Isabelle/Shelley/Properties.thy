@@ -906,4 +906,34 @@ next
   qed
 qed
 
+fun val_snap_state :: "snapshot_state \<Rightarrow> coin" where
+  "val_snap_state (_, utxo_st) = val_utxo_state utxo_st"
+
+lemma snap_value_preservation:
+  assumes "e \<turnstile> s \<rightarrow>\<^bsub>SNAP\<^esub>{\<epsilon>} s'"
+  shows "val_snap_state s = val_snap_state s'"
+proof -
+  from assms show ?thesis
+  proof cases
+    case (snapshot stake delegations oblg decayed deps pp dstate pstate pstake\<^sub>m\<^sub>a\<^sub>r\<^sub>k pstake\<^sub>s\<^sub>e\<^sub>t pstake\<^sub>g\<^sub>o
+        pools_ss fee_ss utxo fees up pools_params)
+    from \<open>s' =
+      (
+        ((stake, delegations), pstake\<^sub>m\<^sub>a\<^sub>r\<^sub>k, pstake\<^sub>s\<^sub>e\<^sub>t, pools_params, fees + decayed),
+        (utxo, oblg, fees + decayed, up)
+      )\<close> have "val_snap_state s' = val_utxo_state (utxo, oblg, fees + decayed, up)"
+      by simp
+    also have "\<dots> = val_utxo utxo + oblg + (fees + decayed)"
+      by simp
+    also from \<open>decayed = deps - oblg\<close> have "\<dots> = val_utxo utxo + deps + fees"
+      by simp
+    also have "\<dots> = val_utxo_state (utxo, deps, fees, up)"
+      by simp
+    also from \<open>s = ((pstake\<^sub>m\<^sub>a\<^sub>r\<^sub>k, pstake\<^sub>s\<^sub>e\<^sub>t, pstake\<^sub>g\<^sub>o, pools_ss, fee_ss), (utxo, deps, fees, up))\<close>
+    have "\<dots> = val_snap_state s"
+      by simp
+    finally show ?thesis ..
+  qed
+qed
+
 end
