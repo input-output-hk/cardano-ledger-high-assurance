@@ -374,16 +374,15 @@ qed
 
 \<comment> \<open>NOTE: Lemma 15.7 in the spec.\<close>
 lemma delegs_value_preservation:
-  assumes "
-    (slot, tx) \<turnstile>
-      ((stk_creds, rewards, i\<^sub>r\<^sub>w\<^sub>d), pstate) \<rightarrow>\<^bsub>DELEGS\<^esub>{\<Gamma>} ((stk_creds', rewards', i\<^sub>r\<^sub>w\<^sub>d), pstate)"
-  shows "val_delegs_state ((stk_creds, rewards, i\<^sub>r\<^sub>w\<^sub>d), pstate) =
-         val_delegs_state ((stk_creds', rewards', i\<^sub>r\<^sub>w\<^sub>d), pstate) + wbalance (txwdrls tx)"
+  assumes "(slot, tx) \<turnstile> s \<rightarrow>\<^bsub>DELEGS\<^esub>{\<Gamma>} s'"
+  shows "val_delegs_state s = val_delegs_state s' + wbalance (txwdrls tx)"
   using assms
-proof (induction "(slot, tx)" "((stk_creds, rewards, i\<^sub>r\<^sub>w\<^sub>d), pstate)" \<Gamma> "((stk_creds', rewards', i\<^sub>r\<^sub>w\<^sub>d),
-  pstate)" arbitrary: slot tx stk_creds rewards i\<^sub>r\<^sub>w\<^sub>d stk_creds' rewards' pstate)
-  case (seq_delg_base wdrls tx rewards rewards' slot stk_creds i\<^sub>r\<^sub>w\<^sub>d pstate)
-  have "val_delegs_state ((stk_creds, rewards, i\<^sub>r\<^sub>w\<^sub>d), pstate) = val_map rewards"
+proof (induction \<Gamma> arbitrary: s' rule: rev_induct)
+  case Nil
+  from \<open>(slot, tx) \<turnstile> s \<rightarrow>\<^bsub>DELEGS\<^esub>{[]} s'\<close> show ?case
+  proof cases
+    case (seq_delg_base wdrls rewards rewards' stk_creds i\<^sub>r\<^sub>w\<^sub>d pstate)
+  from \<open>s = ((stk_creds, rewards, i\<^sub>r\<^sub>w\<^sub>d), pstate)\<close> have "val_delegs_state s = val_map rewards"
     by simp
   also have "\<dots> = val_map wdrls + val_map (rewards --\<^sub>f wdrls)"
     proof -
@@ -402,37 +401,29 @@ proof (induction "(slot, tx)" "((stk_creds, rewards, i\<^sub>r\<^sub>w\<^sub>d),
     also from \<open>rewards' = rewards \<union>\<^sub>\<rightarrow> fmmap (\<lambda>_. 0) wdrls\<close> have "\<dots> =
       val_map rewards' + wbalance (txwdrls tx)"
       by simp
-    finally show ?case
-      by simp
-next
-  case (seq_delg_ind slot tx \<Gamma> dpstate' c)
-  have "snd dpstate' = pstate" and "snd (snd (fst dpstate')) = i\<^sub>r\<^sub>w\<^sub>d"
-  proof -
-    from \<open>slot \<turnstile> dpstate' \<rightarrow>\<^bsub>DELPL\<^esub>{c} ((stk_creds', rewards', i\<^sub>r\<^sub>w\<^sub>d), pstate)\<close>
-    show "snd dpstate' = pstate"
-      using delpl_sts.simps by auto
+    finally show ?thesis
+      using \<open>s' = ((stk_creds, rewards', i\<^sub>r\<^sub>w\<^sub>d), pstate)\<close> by simp
   next
-    from \<open>slot \<turnstile> dpstate' \<rightarrow>\<^bsub>DELPL\<^esub>{c} ((stk_creds', rewards', i\<^sub>r\<^sub>w\<^sub>d), pstate)\<close>
-    have "slot \<turnstile> fst dpstate' \<rightarrow>\<^bsub>DELEG\<^esub>{c} (stk_creds', rewards', i\<^sub>r\<^sub>w\<^sub>d)"
-      using delpl_sts.simps by auto
-    then show "snd (snd (fst dpstate')) = i\<^sub>r\<^sub>w\<^sub>d"
-      using deleg_sts.simps by auto
+    case (seq_delg_ind \<Gamma> dpstate' c)
+    then show ?thesis
+      by simp
   qed
-  with seq_delg_ind.hyps(2) have "val_delegs_state ((stk_creds, rewards, i\<^sub>r\<^sub>w\<^sub>d), pstate) =
-    val_delegs_state ((fst (fst dpstate'), fst (snd (fst dpstate')), i\<^sub>r\<^sub>w\<^sub>d), pstate)
-      + val_map (txwdrls tx)"
-    by (metis prod.exhaust_sel)
-  moreover have "val_deleg_state (fst (fst dpstate'), fst (snd (fst dpstate')), i\<^sub>r\<^sub>w\<^sub>d) =
-    val_deleg_state (stk_creds', rewards', i\<^sub>r\<^sub>w\<^sub>d)"
-  proof -
-    from \<open>slot \<turnstile> dpstate' \<rightarrow>\<^bsub>DELPL\<^esub>{c} ((stk_creds', rewards', i\<^sub>r\<^sub>w\<^sub>d), pstate)\<close>
-    have "slot \<turnstile> fst dpstate' \<rightarrow>\<^bsub>DELEG\<^esub>{c} (stk_creds', rewards', i\<^sub>r\<^sub>w\<^sub>d)"
-      using delpl_sts.simps by auto
-    with \<open>snd (snd (fst dpstate')) = i\<^sub>r\<^sub>w\<^sub>d\<close> show ?thesis
-      using deleg_value_preservation by fastforce
-  qed
-  ultimately show ?case
+next
+  case (snoc c \<Gamma>)
+  from \<open>(slot, tx) \<turnstile> s \<rightarrow>\<^bsub>DELEGS\<^esub>{\<Gamma> @ [c]} s'\<close> obtain s''
+    where "(slot, tx) \<turnstile> s \<rightarrow>\<^bsub>DELEGS\<^esub>{\<Gamma>} s''" and "slot \<turnstile> s'' \<rightarrow>\<^bsub>DELPL\<^esub>{c} s'"
+    using delegs_sts.simps by blast
+  from \<open>(slot, tx) \<turnstile> s \<rightarrow>\<^bsub>DELEGS\<^esub>{\<Gamma>} s''\<close> and snoc.IH have "val_delegs_state s
+    = val_delegs_state s'' + val_map (txwdrls tx)"
     by simp
+  moreover from \<open>slot \<turnstile> s'' \<rightarrow>\<^bsub>DELPL\<^esub>{c} s'\<close> have "slot \<turnstile> fst s'' \<rightarrow>\<^bsub>DELEG\<^esub>{c} fst s'"
+    by (auto simp add: delpl_sts.simps)
+  then have "val_deleg_state (fst s'') = val_deleg_state (fst s')"
+    using deleg_value_preservation by simp
+  moreover have "val_delegs_state s'' = val_deleg_state (fst s'')"
+    by (metis val_delegs_state.elims eq_fst_iff)
+  ultimately show ?case
+    by (metis fst_conv val_delegs_state.elims)
 qed
 
 fun val_poolreap_state :: "pl_reap_state \<Rightarrow> coin" where
@@ -862,7 +853,5 @@ proof -
     then show ?thesis ..
   qed
 qed
-
-
 
 end
