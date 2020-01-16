@@ -14,7 +14,10 @@ type_synonym d_state = "
   (addr_rwd, coin) fmap \<times> \<comment> \<open>rewards\<close>
   (credential, coin) fmap \<comment> \<open>instantaneous rewards\<close>"
 
-typedecl p_state \<comment> \<open>NOTE: Abstract for now\<close>
+type_synonym p_state = "
+  stake_pools \<times> \<comment> \<open>registered pools to creation time\<close>
+  (key_hash, pool_param) fmap \<times> \<comment> \<open>registered pools to pool parameters\<close>
+  (key_hash, epoch) fmap \<comment> \<open>retiring stake pools\<close>"
 
 text \<open> Delegation Environment \<close>
 

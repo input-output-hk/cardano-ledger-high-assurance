@@ -6,7 +6,7 @@ begin
 
 text \<open> Protocol parameter update \<close>
 
-typedecl pp_update \<comment> \<open>NOTE: Abstract for now\<close>
+type_synonym pp_update = "(key_hash_g, p_params) fmap"
 
 text \<open> Application update \<close>
 

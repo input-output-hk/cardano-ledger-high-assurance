@@ -915,11 +915,11 @@ lemma snap_value_preservation:
 proof -
   from assms show ?thesis
   proof cases
-    case (snapshot stake delegations oblg decayed deps pp dstate pstate pstake\<^sub>m\<^sub>a\<^sub>r\<^sub>k pstake\<^sub>s\<^sub>e\<^sub>t pstake\<^sub>g\<^sub>o
-        pools_ss fee_ss utxo fees up pools_params)
+    case (snapshot stk_creds _ _ dstate stpools pool_params _ pstate stake utxo delegations slot
+        oblg pp decayed deps pstake\<^sub>m\<^sub>a\<^sub>r\<^sub>k pstake\<^sub>s\<^sub>e\<^sub>t pstake\<^sub>g\<^sub>o pools_ss fee_ss fees up)
     from \<open>s' =
       (
-        ((stake, delegations), pstake\<^sub>m\<^sub>a\<^sub>r\<^sub>k, pstake\<^sub>s\<^sub>e\<^sub>t, pools_params, fees + decayed),
+        ((stake, delegations), pstake\<^sub>m\<^sub>a\<^sub>r\<^sub>k, pstake\<^sub>s\<^sub>e\<^sub>t, pool_params, fees + decayed),
         (utxo, oblg, fees + decayed, up)
       )\<close> have "val_snap_state s' = val_utxo_state (utxo, oblg, fees + decayed, up)"
       by simp
@@ -932,6 +932,72 @@ proof -
     also from \<open>s = ((pstake\<^sub>m\<^sub>a\<^sub>r\<^sub>k, pstake\<^sub>s\<^sub>e\<^sub>t, pstake\<^sub>g\<^sub>o, pools_ss, fee_ss), (utxo, deps, fees, up))\<close>
     have "\<dots> = val_snap_state s"
       by simp
+    finally show ?thesis ..
+  qed
+qed
+
+fun val_newpp_state :: "new_p_param_state \<Rightarrow> coin" where
+  "val_newpp_state (utxo_st, (treasury, reserves), _) =
+    val_utxo_state utxo_st + val_coin treasury + val_coin reserves"
+
+lemma newpp_value_preservation:
+  assumes "e \<turnstile> s \<rightarrow>\<^bsub>NEWPP\<^esub>{\<epsilon>} s'"
+  shows "val_newpp_state s = val_newpp_state s'"
+proof -
+  from assms show ?thesis
+  proof cases
+    case (new_proto_param_accept _ pp\<^sub>n\<^sub>e\<^sub>w treasury reserves acnt pp _ _ oblg\<^sub>c\<^sub>u\<^sub>r oblg\<^sub>n\<^sub>e\<^sub>w diff utxo deps
+        fees pup aup favs avs utxo_st utxo_st' acnt')
+    from \<open>s' = (utxo_st', acnt', pp\<^sub>n\<^sub>e\<^sub>w)\<close> and \<open>acnt' = (treasury, reserves + diff)\<close>
+    have "val_newpp_state s' =
+      val_utxo_state utxo_st' + val_coin treasury + val_coin (reserves + diff)"
+      by simp
+    also from \<open>utxo_st' = (utxo, oblg\<^sub>n\<^sub>e\<^sub>w, fees, {$$}, aup, favs, avs)\<close> have "\<dots> =
+      val_utxo utxo + oblg\<^sub>n\<^sub>e\<^sub>w + fees + val_coin treasury + val_coin (reserves + diff)"
+      by simp
+    also from \<open>diff = oblg\<^sub>c\<^sub>u\<^sub>r - oblg\<^sub>n\<^sub>e\<^sub>w\<close> have "\<dots> =
+      val_utxo utxo + oblg\<^sub>c\<^sub>u\<^sub>r - diff + fees + val_coin treasury + val_coin (reserves + diff)"
+      by simp
+    also have "\<dots> = val_utxo utxo + oblg\<^sub>c\<^sub>u\<^sub>r + fees + treasury + reserves"
+      by simp
+    also from \<open>deps = oblg\<^sub>c\<^sub>u\<^sub>r\<close> have "\<dots> = val_utxo utxo + deps + fees + treasury + reserves"
+      by simp
+    also from \<open>(utxo, deps, fees, pup, aup, favs, avs) = utxo_st\<close> have "\<dots> =
+      val_utxo_state utxo_st + treasury + reserves"
+      by auto
+    also from \<open>(treasury, reserves) = acnt\<close> and \<open>s = (utxo_st, acnt, pp)\<close> have "\<dots> =
+      val_newpp_state s"
+      by auto
+    finally show ?thesis ..
+  next
+    case (new_proto_param_denied_1 _ _ treasury reserves acnt pp _ _ utxo deps fees pup aup favs avs
+        utxo_st utxo_st')
+    from \<open>s' = (utxo_st', acnt, pp)\<close> and \<open>(treasury, reserves) = acnt\<close>
+    have "val_newpp_state s' = val_utxo_state utxo_st' + val_coin treasury + val_coin reserves"
+      by auto
+    also from \<open>utxo_st' = (utxo, deps, fees, {$$}, aup, favs, avs)\<close> have "\<dots> =
+      val_utxo utxo + deps + fees + val_coin treasury + val_coin reserves"
+      by simp
+    also from \<open>(utxo, deps, fees, pup, aup, favs, avs) = utxo_st\<close> have "\<dots> =
+      val_utxo_state utxo_st + treasury + reserves"
+      by auto
+    also from \<open>(treasury, reserves) = acnt\<close> and \<open>s = (utxo_st, acnt, pp)\<close> have "\<dots> =
+      val_newpp_state s"
+      by auto
+    finally show ?thesis ..
+  next
+    case (new_proto_param_denied_2 _ utxo deps fees pup aup favs avs utxo_st utxo_st' _ _ acnt pp)
+    from \<open>s' = (utxo_st', acnt, pp)\<close>
+    have "val_newpp_state s' = val_utxo_state utxo_st' + val_coin (fst acnt) + val_coin (snd acnt)"
+      by (metis prod.exhaust_sel val_newpp_state.simps)
+    also from \<open>utxo_st' = (utxo, deps, fees, {$$}, aup, favs, avs)\<close> have "\<dots> =
+      val_utxo utxo + deps + fees + val_coin (fst acnt) + val_coin (snd acnt)"
+      by simp
+    also from \<open>(utxo, deps, fees, pup, aup, favs, avs) = utxo_st\<close> have "\<dots> =
+      val_utxo_state utxo_st + fst acnt + snd acnt"
+      by auto
+    also from \<open>s = (utxo_st, acnt, pp)\<close> have "\<dots> = val_newpp_state s"
+      by (metis prod.collapse val_coin.elims val_newpp_state.simps)
     finally show ?thesis ..
   qed
 qed

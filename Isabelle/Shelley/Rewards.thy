@@ -6,9 +6,16 @@ begin
 
 subsection \<open> Helper Functions and Accounting Fields \<close>
 
+text \<open> Total possible refunds \<close>
+
+fun obligation :: "p_params \<Rightarrow> stake_creds \<Rightarrow> stake_pools \<Rightarrow> slot \<Rightarrow> coin" where
+  "obligation pp stk_creds stpools cslot = undefined" \<comment> \<open>NOTE: Undefined for now\<close>
+
 text \<open> Accounting Fields \<close>
 
-type_synonym acnt = "coin \<times> coin"
+type_synonym acnt = "
+  coin \<times> \<comment> \<open>treasury pot\<close>
+  coin \<comment> \<open>reserve pot\<close>"
 
 subsection \<open> Stake Distribution Calculation \<close>
 
@@ -19,6 +26,11 @@ type_synonym blocks_made = "(key_hash, nat) fmap"
 text \<open> Stake \<close>
 
 type_synonym stake = "(key_hash, coin) fmap"
+
+text \<open> Stake Distribution Function \<close>
+
+fun stake_distr :: "utxo \<Rightarrow> d_state \<Rightarrow> p_state \<Rightarrow> stake" where
+  "stake_distr utxo dstate pstate = undefined" \<comment> \<open>NOTE: Undefined for now\<close>
 
 subsection \<open> Snapshot Transition \<close>
 
@@ -48,8 +60,7 @@ text \<open> Snapshot Inference Rule \<close>
 
 text \<open>
   NOTE:
-  \<^item> \<open>stake\<close>, \<open>delegations\<close> and \<open>oblg\<close> are not defined since they are not related to the
-    "preservation of value" property.
+  \<^item> \<open>delegations\<close> is not defined since it is not related to the "preservation of value" property.
 \<close>
 inductive snap_sts :: "snapshot_env \<Rightarrow> snapshot_state \<Rightarrow> epoch \<Rightarrow> snapshot_state \<Rightarrow> bool"
   (\<open>_ \<turnstile> _ \<rightarrow>\<^bsub>SNAP\<^esub>{_} _\<close> [51, 0, 51] 50)
@@ -62,12 +73,15 @@ inductive snap_sts :: "snapshot_env \<Rightarrow> snapshot_state \<Rightarrow> e
         )
         \<rightarrow>\<^bsub>SNAP\<^esub>{e}
         (
-          ((stake, delegations), pstake\<^sub>m\<^sub>a\<^sub>r\<^sub>k, pstake\<^sub>s\<^sub>e\<^sub>t, pools_params, fees + decayed),
+          ((stake, delegations), pstake\<^sub>m\<^sub>a\<^sub>r\<^sub>k, pstake\<^sub>s\<^sub>e\<^sub>t, pool_params, fees + decayed),
           (utxo, oblg, fees + decayed, up)
         )"
-      if "stake = undefined"
+      if "(stk_creds, _, _) = dstate"
+      and "(stpools, pool_params, _) = pstate"
+      and "stake = stake_distr utxo dstate pstate"
       and "delegations = undefined"
-      and "oblg = undefined"
+      and "slot = first_slot e"
+      and "oblg = obligation pp stk_creds stpools slot"
       and "decayed = deps - oblg"
 
 subsection \<open> Pool Reaping Transition \<close>
@@ -105,6 +119,80 @@ inductive poolreap_sts :: "p_params \<Rightarrow> pl_reap_state \<Rightarrow> ep
       and "m_refunds = fmdom' rewards \<lhd>/ reward_acnts'"
       and "refunded = (\<Sum>k \<in> fmdom' refunds. refunds $$! k)"
       and "unclaimed = (\<Sum>k \<in> fmdom' m_refunds. m_refunds $$! k)"
+
+subsection \<open> Protocol Parameters Update Transition \<close>
+
+text \<open> New Proto Param environment \<close>
+
+type_synonym new_p_param_env = "
+  p_params option \<times> \<comment> \<open>new protocol parameters\<close>
+  d_state \<times> \<comment> \<open>delegation state\<close>
+  p_state \<comment> \<open>pool state\<close>"
+
+text \<open> New Proto Param States \<close>
+
+type_synonym new_p_param_state = "
+  utxo_state \<times> \<comment> \<open>utxo state\<close>
+  acnt \<times> \<comment> \<open>accounting\<close>
+  p_params \<comment> \<open>current protocol parameters\<close>"
+
+text \<open> New Proto Param Inference Rules \<close>
+
+abbreviation newpp_oblgs where
+  "newpp_oblgs pp\<^sub>n\<^sub>e\<^sub>w pp dstate pstate e reserves \<equiv>
+    (
+      let
+        stk_creds = fst dstate;
+        stpools = fst pstate;
+        slot = first_slot e;
+        oblg\<^sub>c\<^sub>u\<^sub>r = obligation pp stk_creds stpools slot;
+        oblg\<^sub>n\<^sub>e\<^sub>w = obligation pp\<^sub>n\<^sub>e\<^sub>w stk_creds stpools slot
+      in
+        (oblg\<^sub>c\<^sub>u\<^sub>r, oblg\<^sub>n\<^sub>e\<^sub>w)
+    )"
+
+abbreviation newpp_accepted where
+  "newpp_accepted pp\<^sub>n\<^sub>e\<^sub>w pp dstate pstate e reserves \<equiv>
+    (
+      let
+        (_, _, i\<^sub>r\<^sub>w\<^sub>d) = dstate;
+        (oblg\<^sub>c\<^sub>u\<^sub>r, oblg\<^sub>n\<^sub>e\<^sub>w) = newpp_oblgs pp\<^sub>n\<^sub>e\<^sub>w pp dstate pstate e reserves;
+        diff = oblg\<^sub>c\<^sub>u\<^sub>r - oblg\<^sub>n\<^sub>e\<^sub>w
+      in
+        reserves + diff \<ge> (\<Sum> c \<in> fmdom' i\<^sub>r\<^sub>w\<^sub>d. i\<^sub>r\<^sub>w\<^sub>d $$! c) \<and>
+        max_tx_size pp\<^sub>n\<^sub>e\<^sub>w + max_header_size pp\<^sub>n\<^sub>e\<^sub>w < max_block_size pp\<^sub>n\<^sub>e\<^sub>w
+    )"
+
+text \<open>
+  NOTE:
+  \<^item> For the sake of simplicity and readability, an extra rule is added.
+\<close>
+inductive newpp_sts :: "new_p_param_env \<Rightarrow> new_p_param_state \<Rightarrow> epoch \<Rightarrow> new_p_param_state \<Rightarrow> bool"
+  (\<open>_ \<turnstile> _ \<rightarrow>\<^bsub>NEWPP\<^esub>{_} _\<close> [51, 0, 51] 50)
+  where
+    new_proto_param_accept: "
+      (opp\<^sub>n\<^sub>e\<^sub>w, dstate, pstate) \<turnstile> (utxo_st, acnt, pp) \<rightarrow>\<^bsub>NEWPP\<^esub>{e} (utxo_st', acnt', pp\<^sub>n\<^sub>e\<^sub>w)"
+      if "opp\<^sub>n\<^sub>e\<^sub>w = Some pp\<^sub>n\<^sub>e\<^sub>w"
+      and "(treasury, reserves) = acnt"
+      and "newpp_accepted pp\<^sub>n\<^sub>e\<^sub>w pp dstate pstate e reserves"
+      and "(oblg\<^sub>c\<^sub>u\<^sub>r, oblg\<^sub>n\<^sub>e\<^sub>w) = newpp_oblgs pp\<^sub>n\<^sub>e\<^sub>w pp dstate pstate e reserves"
+      and "diff = oblg\<^sub>c\<^sub>u\<^sub>r - oblg\<^sub>n\<^sub>e\<^sub>w"
+      and "(utxo, deps, fees, (pup, aup, favs, avs)) = utxo_st"
+      and "deps = oblg\<^sub>c\<^sub>u\<^sub>r"
+      and "utxo_st' = (utxo, oblg\<^sub>n\<^sub>e\<^sub>w, fees, ({$$}, aup, favs, avs))"
+      and "acnt' = (treasury, reserves + diff)"
+  | new_proto_param_denied_1: "
+      (opp\<^sub>n\<^sub>e\<^sub>w, dstate, pstate) \<turnstile> (utxo_st, acnt, pp) \<rightarrow>\<^bsub>NEWPP\<^esub>{e} (utxo_st', acnt, pp)"
+      if "opp\<^sub>n\<^sub>e\<^sub>w = Some pp\<^sub>n\<^sub>e\<^sub>w"
+      and "(treasury, reserves) = acnt"
+      and "\<not> newpp_accepted pp\<^sub>n\<^sub>e\<^sub>w pp dstate pstate e reserves"
+      and "(utxo, deps, fees, (pup, aup, favs, avs)) = utxo_st"
+      and "utxo_st' = (utxo, deps, fees, ({$$}, aup, favs, avs))"
+  | new_proto_param_denied_2: "
+      (opp\<^sub>n\<^sub>e\<^sub>w, dstate, pstate) \<turnstile> (utxo_st, acnt, pp) \<rightarrow>\<^bsub>NEWPP\<^esub>{e} (utxo_st', acnt, pp)"
+      if "opp\<^sub>n\<^sub>e\<^sub>w = None"
+      and "(utxo, deps, fees, (pup, aup, favs, avs)) = utxo_st"
+      and "utxo_st' = (utxo, deps, fees, ({$$}, aup, favs, avs))"
 
 subsection \<open> Complete Epoch Boundary Transition \<close>
 
