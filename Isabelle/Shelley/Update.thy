@@ -4,9 +4,18 @@ theory Update
   imports Basic_Types Protocol_Parameters Cryptography Finite_Map_Extras
 begin
 
+subsection \<open> Protocol Parameter Update Proposals \<close>
+
 text \<open> Protocol parameter update \<close>
 
 type_synonym pp_update = "(key_hash_g, p_params) fmap"
+
+text \<open> Epoch Helper Functions \<close>
+
+fun voted_value\<^sub>P\<^sub>P\<^sub>a\<^sub>r\<^sub>a\<^sub>m\<^sub>s :: "(key_hash_g, p_params) fmap \<Rightarrow> p_params option" where
+  "voted_value\<^sub>P\<^sub>P\<^sub>a\<^sub>r\<^sub>a\<^sub>m\<^sub>s vs = undefined" \<comment> \<open>NOTE: Undefined for now\<close>
+
+subsection \<open> Application Version Update Proposals \<close>
 
 text \<open> Application update \<close>
 

@@ -200,6 +200,20 @@ text \<open> Epoch States \<close>
 
 type_synonym epoch_state = "acnt \<times> snapshots \<times> l_state \<times> p_params"
 
+text \<open> Epoch Inference Rule \<close>
+
+inductive epoch_sts :: "epoch_state \<Rightarrow> epoch \<Rightarrow> epoch_state \<Rightarrow> bool"
+  (\<open>\<turnstile> _ \<rightarrow>\<^bsub>EPOCH\<^esub>{_} _\<close> [0, 51] 50)
+  where
+    epoch: "\<turnstile> (acnt, ss, ls, pp) \<rightarrow>\<^bsub>EPOCH\<^esub>{e} (acnt'', ss', ls', pp')"
+      if "(utxo_st, (dstate, pstate)) = ls"
+      and "pp \<turnstile> (utxo_st, acnt, dstate, pstate) \<rightarrow>\<^bsub>POOLREAP\<^esub>{e} (utxo_st', acnt', dstate', pstate')"
+      and "(pp, dstate', pstate') \<turnstile> (ss, utxo_st') \<rightarrow>\<^bsub>SNAP\<^esub>{e} (ss', utxo_st'')"
+      and "(_, _, _, (pup, _, _, _)) = utxo_st''"
+      and "pp\<^sub>n\<^sub>e\<^sub>w = voted_value\<^sub>P\<^sub>P\<^sub>a\<^sub>r\<^sub>a\<^sub>m\<^sub>s pup"
+      and "(pp\<^sub>n\<^sub>e\<^sub>w, dstate', pstate') \<turnstile> (utxo_st'', acnt', pp) \<rightarrow>\<^bsub>NEWPP\<^esub>{e} (utxo_st''', acnt'', pp')"
+      and "ls' = (utxo_st''', (dstate', pstate'))"
+
 subsection \<open> Reward Distribution Calculation \<close>
 
 text \<open> Calculation to reward all stake pools \<close>

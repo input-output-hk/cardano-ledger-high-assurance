@@ -426,9 +426,12 @@ next
     by (metis fst_conv val_delegs_state.elims)
 qed
 
+fun val_acnt :: "acnt \<Rightarrow> coin" where
+  "val_acnt (treasury, reserves) = val_coin treasury + val_coin reserves"
+
 fun val_poolreap_state :: "pl_reap_state \<Rightarrow> coin" where
-  "val_poolreap_state ((_, deps, _, _), (treasury, _), (_, rewards, _), _) =
-    val_coin deps + val_coin treasury + val_map rewards"
+  "val_poolreap_state (utxo_st, acnt, dstate, _) =
+    val_utxo_state utxo_st + val_acnt acnt + val_deleg_state dstate"
 
 lemma val_map_fmmap_keys:
   assumes "fmdom' m\<^sub>2 \<subseteq> fmdom' m\<^sub>1"
@@ -541,11 +544,24 @@ proof -
     case (pool_reap reward_acnts' refunds rewards m_refunds refunded unclaimed utxo deps fees ups
       treasury reserves stk_creds i\<^sub>r\<^sub>w\<^sub>d pstate)
     from pool_reap(2) have "val_poolreap_state s' =
-      deps - (unclaimed + refunded) + treasury + unclaimed + val_map (rewards \<union>\<^sub>+ refunds)"
+      val_utxo_state (utxo, deps - (unclaimed + refunded), fees, ups)
+      + val_acnt (treasury + unclaimed, reserves)
+      + val_deleg_state (stk_creds, rewards \<union>\<^sub>+ refunds, i\<^sub>r\<^sub>w\<^sub>d)"
       by simp
-    also have "\<dots> = deps - refunded + treasury + val_map (rewards \<union>\<^sub>+ refunds)"
+    also have "\<dots> =
+      (val_utxo utxo + deps - (unclaimed + refunded) + fees)
+      + (treasury + unclaimed + reserves)
+      + val_map (rewards \<union>\<^sub>+ refunds)"
       by simp
-    also have "\<dots> = deps - refunded + treasury + val_map rewards + val_map refunds"
+    also have "\<dots> =
+      val_utxo utxo + fees + reserves + deps - (unclaimed + refunded) + treasury + unclaimed
+      + val_map (rewards \<union>\<^sub>+ refunds)"
+      by simp
+    also have "\<dots> = val_utxo utxo + fees + reserves + deps - refunded + treasury
+      + val_map (rewards \<union>\<^sub>+ refunds)"
+      by simp
+    also have "\<dots> = val_utxo utxo + fees + reserves + deps - refunded + treasury
+      + val_map rewards + val_map refunds"
     proof -
       have "val_map (rewards \<union>\<^sub>+ refunds) = val_map rewards + val_map refunds"
       proof -
@@ -580,9 +596,11 @@ proof -
   qed
 qed
 
+fun val_ledger_state :: "l_state \<Rightarrow> coin" where
+  "val_ledger_state (utxo_st, dpstate) = val_utxo_state utxo_st + val_delegs_state dpstate"
+
 fun val_epoch_state :: "epoch_state \<Rightarrow> coin" where
-  "val_epoch_state ((treasury, reserves), _, ((_, _, fees, _), ((_, rewards, _), _)), _) =
-    val_coin treasury + val_coin reserves + val_coin fees + val_map rewards"
+  "val_epoch_state (acnt, _, ls, _) = val_acnt acnt + val_ledger_state ls"
 
 lemma val_map_union_plus: (* TODO: Find nicer proofs for SMT calls. *)
   shows "val_map (m\<^sub>1 \<union>\<^sub>+ m\<^sub>2) = val_map m\<^sub>1 + val_map m\<^sub>2"
@@ -736,7 +754,7 @@ proof -
         ((utxo, deps, fees, up), ((stk_creds, rewards, i\<^sub>r\<^sub>w\<^sub>d), pstate)),
         ppm
       )"
-    using val_epoch_state.cases by blast
+    by (metis old.prod.exhaust val_deleg_state.cases)
   moreover obtain \<Delta>t \<Delta>r rs \<Delta>f rew\<^sub>m\<^sub>i\<^sub>r where f2: "create_r_upd b s = (\<Delta>t, \<Delta>r, rs, \<Delta>f, rew\<^sub>m\<^sub>i\<^sub>r)"
     using prod_cases5 by blast
   ultimately obtain non_distributed and rew'\<^sub>m\<^sub>i\<^sub>r and update\<^sub>r\<^sub>w\<^sub>d and unregistered
@@ -754,13 +772,18 @@ proof -
       and f7: "unregistered = fmdom' stk_creds \<lhd>/ rew\<^sub>m\<^sub>i\<^sub>r"
     by (metis apply_r_upd.simps)
   then have "val_epoch_state (apply_r_upd (create_r_upd b s) s) =
-    treasury + reserves + fees + val_map rewards + \<Delta>t + \<Delta>r + non_distributed + \<Delta>f + val_map rs
-    + val_map update\<^sub>r\<^sub>w\<^sub>d"
+    treasury + reserves + val_utxo utxo + deps + fees + val_map rewards + \<Delta>t + \<Delta>r + non_distributed
+    + \<Delta>f + val_map rs + val_map update\<^sub>r\<^sub>w\<^sub>d"
   proof -
     from f2 and f3 have "val_epoch_state (apply_r_upd (create_r_upd b s) s) =
-      (treasury + \<Delta>t) + (reserves + \<Delta>r + non_distributed) + (fees + \<Delta>f)
+      val_acnt (treasury + \<Delta>t, reserves + \<Delta>r + non_distributed)
+      + val_ledger_state (
+        (utxo, deps, fees + \<Delta>f, up), ((stk_creds, (rewards \<union>\<^sub>+ rs) \<union>\<^sub>+ update\<^sub>r\<^sub>w\<^sub>d, {$$}), pstate))"
+      by simp
+    then have "val_epoch_state (apply_r_upd (create_r_upd b s) s) =
+      (treasury + \<Delta>t) + (reserves + \<Delta>r + non_distributed) + val_utxo utxo + deps + (fees + \<Delta>f)
       + val_map ((rewards \<union>\<^sub>+ rs) \<union>\<^sub>+ update\<^sub>r\<^sub>w\<^sub>d)"
-      using val_coin.simps and val_epoch_state.simps by presburger
+      by auto
     moreover have "val_map ((rewards \<union>\<^sub>+ rs) \<union>\<^sub>+ update\<^sub>r\<^sub>w\<^sub>d) =
       val_map rewards + val_map rs + val_map update\<^sub>r\<^sub>w\<^sub>d"
       using val_map_union_plus by metis
@@ -830,7 +853,8 @@ proof -
   qed
     finally show ?thesis .
   qed
-  moreover have "val_epoch_state s = treasury + reserves + fees + val_map rewards"
+  moreover have "val_epoch_state s =
+    treasury + reserves + val_utxo utxo + deps + fees + val_map rewards"
     using f1 by simp
   ultimately show ?thesis
     by simp
@@ -853,9 +877,6 @@ proof -
     then show ?thesis ..
   qed
 qed
-
-fun val_ledger_state :: "l_state \<Rightarrow> coin" where
-  "val_ledger_state (utxo_st, dpstate) = val_utxo_state utxo_st + val_delegs_state dpstate"
 
 lemma ledger_value_preservation:
   assumes "e \<turnstile> s \<rightarrow>\<^bsub>LEDGER\<^esub>{tx} s'"
@@ -1001,5 +1022,65 @@ proof -
     finally show ?thesis ..
   qed
 qed
+
+
+lemma epoch_value_preservation:
+  assumes "\<turnstile> s \<rightarrow>\<^bsub>EPOCH\<^esub>{\<epsilon>} s'"
+  shows "val_epoch_state s = val_epoch_state s'"
+proof -
+  from assms show ?thesis
+  proof cases
+    case (epoch utxo_st dstate pstate ls pp acnt utxo_st' acnt' dstate' pstate' ss ss' utxo_st''
+        _ _ _ pup _ _ _ pp\<^sub>n\<^sub>e\<^sub>w utxo_st''' acnt'' pp' ls')
+    from \<open>(pp\<^sub>n\<^sub>e\<^sub>w, dstate', pstate') \<turnstile> (utxo_st'', acnt', pp) \<rightarrow>\<^bsub>NEWPP\<^esub>{\<epsilon>} (utxo_st''', acnt'', pp')\<close>
+    have "val_newpp_state (utxo_st'', acnt', pp) = val_newpp_state (utxo_st''', acnt'', pp')"
+      using newpp_value_preservation by simp
+    then have f1: "val_utxo_state utxo_st'' + val_acnt acnt' =
+      val_utxo_state utxo_st''' + val_acnt acnt''"
+      by (metis add.assoc old.prod.exhaust val_acnt.simps val_newpp_state.simps)
+    moreover from \<open>(pp, dstate', pstate') \<turnstile> (ss, utxo_st') \<rightarrow>\<^bsub>SNAP\<^esub>{\<epsilon>} (ss', utxo_st'')\<close>
+    have "val_snap_state (ss', utxo_st'') = val_snap_state (ss, utxo_st')"
+      using snap_value_preservation by presburger
+    then have f2: "val_utxo_state utxo_st'' = val_utxo_state utxo_st'"
+      by simp
+    moreover
+    from \<open>pp \<turnstile> (utxo_st, acnt, dstate, pstate) \<rightarrow>\<^bsub>POOLREAP\<^esub>{\<epsilon>} (utxo_st', acnt', dstate', pstate')\<close>
+    have "val_poolreap_state (utxo_st', acnt', dstate', pstate')
+      = val_poolreap_state (utxo_st, acnt, dstate, pstate)"
+      using poolreap_value_preservation by presburger
+    then have f3: "val_utxo_state utxo_st' + val_acnt acnt' + val_deleg_state dstate' =
+      val_utxo_state utxo_st + val_acnt acnt + val_deleg_state dstate"
+      by simp
+    moreover have f4: "val_epoch_state s' =
+      val_acnt acnt'' + val_utxo_state utxo_st''' + val_deleg_state dstate'"
+    proof -
+      from \<open>s' = (acnt'', ss', ls', pp')\<close> have "val_epoch_state s' =
+      val_acnt acnt'' + val_ledger_state ls'"
+        by simp
+      also from \<open>ls' = (utxo_st''', (dstate', pstate'))\<close> have "\<dots> =
+      val_acnt acnt'' + val_utxo_state utxo_st''' + val_delegs_state (dstate', pstate')"
+        by simp
+      finally show ?thesis
+        by simp
+    qed
+    ultimately show ?thesis
+    proof -
+      from f4 have "val_epoch_state s' =
+        (val_acnt acnt'' + val_utxo_state utxo_st''') + val_deleg_state dstate'"
+        by simp
+      also from f1 have "\<dots> = (val_acnt acnt' + val_utxo_state utxo_st'') + val_deleg_state dstate'"
+        by simp
+      also from f2 have "\<dots> = val_acnt acnt' + val_utxo_state utxo_st' + val_deleg_state dstate'"
+        by simp
+      also from f3 have "\<dots> = val_utxo_state utxo_st + val_acnt acnt + val_deleg_state dstate"
+        by simp
+      also from \<open>(utxo_st, (dstate, pstate)) = ls\<close> have "\<dots> = val_acnt acnt + val_ledger_state ls"
+        by auto
+      finally show ?thesis using \<open>s = (acnt, ss, ls, pp)\<close>
+        by simp
+    qed
+  qed
+qed
+
 
 end
