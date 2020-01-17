@@ -18,7 +18,7 @@ abbreviation val_utxo :: "utxo \<Rightarrow> coin" where
   "val_utxo utxo \<equiv> ubalance utxo"
 
 fun val_utxo_state :: "utxo_state \<Rightarrow> coin" where
-  "val_utxo_state (utxo, deps, fees, _) = val_utxo utxo + deps + fees"
+  "val_utxo_state (utxo, deps, fees, _) = val_utxo utxo + val_coin deps + val_coin fees"
 
 lemma val_map_add:
   assumes "m $$ k = None"
@@ -262,7 +262,7 @@ proof -
 qed
 
 fun val_delegs_state :: "d_p_state \<Rightarrow> coin" where
-  "val_delegs_state (d_state, _) = val_deleg_state d_state"
+  "val_delegs_state (dstate, _) = val_deleg_state dstate"
 
 lemma val_map_minus:
   assumes "m\<^sub>2 \<subseteq>\<^sub>f m\<^sub>1"
@@ -958,8 +958,7 @@ proof -
 qed
 
 fun val_newpp_state :: "new_p_param_state \<Rightarrow> coin" where
-  "val_newpp_state (utxo_st, (treasury, reserves), _) =
-    val_utxo_state utxo_st + val_coin treasury + val_coin reserves"
+  "val_newpp_state (utxo_st, acnt, _) = val_utxo_state utxo_st + val_acnt acnt"
 
 lemma newpp_value_preservation:
   assumes "e \<turnstile> s \<rightarrow>\<^bsub>NEWPP\<^esub>{\<epsilon>} s'"
@@ -1008,17 +1007,15 @@ proof -
     finally show ?thesis ..
   next
     case (new_proto_param_denied_2 _ utxo deps fees pup aup favs avs utxo_st utxo_st' _ _ acnt pp)
-    from \<open>s' = (utxo_st', acnt, pp)\<close>
-    have "val_newpp_state s' = val_utxo_state utxo_st' + val_coin (fst acnt) + val_coin (snd acnt)"
-      by (metis prod.exhaust_sel val_newpp_state.simps)
-    also from \<open>utxo_st' = (utxo, deps, fees, {$$}, aup, favs, avs)\<close> have "\<dots> =
-      val_utxo utxo + deps + fees + val_coin (fst acnt) + val_coin (snd acnt)"
+    from \<open>s' = (utxo_st', acnt, pp)\<close> have "val_newpp_state s' =
+      val_utxo_state utxo_st' + val_acnt acnt"
       by simp
-    also from \<open>(utxo, deps, fees, pup, aup, favs, avs) = utxo_st\<close> have "\<dots> =
-      val_utxo_state utxo_st + fst acnt + snd acnt"
+    also from \<open>utxo_st' = (utxo, deps, fees, {$$}, aup, favs, avs)\<close> have "\<dots> =
+      val_utxo utxo + val_coin deps + val_coin fees + val_acnt acnt"
+      by simp
+    also from \<open>(utxo, deps, fees, pup, aup, favs, avs) = utxo_st\<close> and \<open>s = (utxo_st, acnt, pp)\<close>
+    have "\<dots> = val_newpp_state s"
       by auto
-    also from \<open>s = (utxo_st, acnt, pp)\<close> have "\<dots> = val_newpp_state s"
-      by (metis prod.collapse val_coin.elims val_newpp_state.simps)
     finally show ?thesis ..
   qed
 qed
@@ -1034,10 +1031,10 @@ proof -
         _ _ _ pup _ _ _ pp\<^sub>n\<^sub>e\<^sub>w utxo_st''' acnt'' pp' ls')
     from \<open>(pp\<^sub>n\<^sub>e\<^sub>w, dstate', pstate') \<turnstile> (utxo_st'', acnt', pp) \<rightarrow>\<^bsub>NEWPP\<^esub>{\<epsilon>} (utxo_st''', acnt'', pp')\<close>
     have "val_newpp_state (utxo_st'', acnt', pp) = val_newpp_state (utxo_st''', acnt'', pp')"
-      using newpp_value_preservation by simp
+      using newpp_value_preservation by fast
     then have f1: "val_utxo_state utxo_st'' + val_acnt acnt' =
       val_utxo_state utxo_st''' + val_acnt acnt''"
-      by (metis add.assoc old.prod.exhaust val_acnt.simps val_newpp_state.simps)
+      by simp
     moreover from \<open>(pp, dstate', pstate') \<turnstile> (ss, utxo_st') \<rightarrow>\<^bsub>SNAP\<^esub>{\<epsilon>} (ss', utxo_st'')\<close>
     have "val_snap_state (ss', utxo_st'') = val_snap_state (ss, utxo_st')"
       using snap_value_preservation by presburger
