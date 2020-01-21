@@ -207,8 +207,8 @@ inductive epoch_sts :: "epoch_state \<Rightarrow> epoch \<Rightarrow> epoch_stat
   where
     epoch: "\<turnstile> (acnt, ss, ls, pp) \<rightarrow>\<^bsub>EPOCH\<^esub>{e} (acnt'', ss', ls', pp')"
       if "(utxo_st, (dstate, pstate)) = ls"
-      and "pp \<turnstile> (utxo_st, acnt, dstate, pstate) \<rightarrow>\<^bsub>POOLREAP\<^esub>{e} (utxo_st', acnt', dstate', pstate')"
-      and "(pp, dstate', pstate') \<turnstile> (ss, utxo_st') \<rightarrow>\<^bsub>SNAP\<^esub>{e} (ss', utxo_st'')"
+      and "(pp, dstate, pstate) \<turnstile> (ss, utxo_st) \<rightarrow>\<^bsub>SNAP\<^esub>{e} (ss', utxo_st')"
+      and "pp \<turnstile> (utxo_st', acnt, dstate, pstate) \<rightarrow>\<^bsub>POOLREAP\<^esub>{e} (utxo_st'', acnt', dstate', pstate')"
       and "(_, _, _, (pup, _, _, _)) = utxo_st''"
       and "pp\<^sub>n\<^sub>e\<^sub>w = voted_value\<^sub>P\<^sub>P\<^sub>a\<^sub>r\<^sub>a\<^sub>m\<^sub>s pup"
       and "(pp\<^sub>n\<^sub>e\<^sub>w, dstate', pstate') \<turnstile> (utxo_st'', acnt', pp) \<rightarrow>\<^bsub>NEWPP\<^esub>{e} (utxo_st''', acnt'', pp')"

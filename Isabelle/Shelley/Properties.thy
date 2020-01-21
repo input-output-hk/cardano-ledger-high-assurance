@@ -1033,7 +1033,7 @@ lemma epoch_value_preservation:
 proof -
   from assms show ?thesis
   proof cases
-    case (epoch utxo_st dstate pstate ls pp acnt utxo_st' acnt' dstate' pstate' ss ss' utxo_st''
+    case (epoch utxo_st dstate pstate ls pp ss ss' utxo_st' acnt utxo_st'' acnt' dstate' pstate'
         _ _ _ pup _ _ _ pp\<^sub>n\<^sub>e\<^sub>w utxo_st''' acnt'' pp' ls')
     from \<open>(pp\<^sub>n\<^sub>e\<^sub>w, dstate', pstate') \<turnstile> (utxo_st'', acnt', pp) \<rightarrow>\<^bsub>NEWPP\<^esub>{\<epsilon>} (utxo_st''', acnt'', pp')\<close>
     have "val_newpp_state (utxo_st'', acnt', pp) = val_newpp_state (utxo_st''', acnt'', pp')"
@@ -1041,18 +1041,18 @@ proof -
     then have f1: "val_utxo_state utxo_st'' + val_acnt acnt' =
       val_utxo_state utxo_st''' + val_acnt acnt''"
       by simp
-    moreover from \<open>(pp, dstate', pstate') \<turnstile> (ss, utxo_st') \<rightarrow>\<^bsub>SNAP\<^esub>{\<epsilon>} (ss', utxo_st'')\<close>
-    have "val_snap_state (ss', utxo_st'') = val_snap_state (ss, utxo_st')"
-      using snap_value_preservation by presburger
-    then have f2: "val_utxo_state utxo_st'' = val_utxo_state utxo_st'"
-      by simp
     moreover
-    from \<open>pp \<turnstile> (utxo_st, acnt, dstate, pstate) \<rightarrow>\<^bsub>POOLREAP\<^esub>{\<epsilon>} (utxo_st', acnt', dstate', pstate')\<close>
-    have "val_poolreap_state (utxo_st', acnt', dstate', pstate')
-      = val_poolreap_state (utxo_st, acnt, dstate, pstate)"
+    from \<open>pp \<turnstile> (utxo_st', acnt, dstate, pstate) \<rightarrow>\<^bsub>POOLREAP\<^esub>{\<epsilon>} (utxo_st'', acnt', dstate', pstate')\<close>
+    have "val_poolreap_state (utxo_st', acnt, dstate, pstate)
+      = val_poolreap_state (utxo_st'', acnt', dstate', pstate')"
       using poolreap_value_preservation by presburger
-    then have f3: "val_utxo_state utxo_st' + val_acnt acnt' + val_deleg_state dstate' =
-      val_utxo_state utxo_st + val_acnt acnt + val_deleg_state dstate"
+    then have f3: "val_utxo_state utxo_st' + val_acnt acnt + val_deleg_state dstate =
+      val_utxo_state utxo_st'' + val_acnt acnt' + val_deleg_state dstate'"
+      by simp
+    moreover from \<open>(pp, dstate, pstate) \<turnstile> (ss, utxo_st) \<rightarrow>\<^bsub>SNAP\<^esub>{\<epsilon>} (ss', utxo_st')\<close>
+    have "val_snap_state (ss, utxo_st) = val_snap_state (ss', utxo_st')"
+      using snap_value_preservation by presburger
+    then have f2: "val_utxo_state utxo_st = val_utxo_state utxo_st'"
       by simp
     moreover have f4: "val_epoch_state s' =
       val_acnt acnt'' + val_utxo_state utxo_st''' + val_deleg_state dstate'"
@@ -1073,9 +1073,9 @@ proof -
         by simp
       also from f1 have "\<dots> = (val_acnt acnt' + val_utxo_state utxo_st'') + val_deleg_state dstate'"
         by simp
-      also from f2 have "\<dots> = val_acnt acnt' + val_utxo_state utxo_st' + val_deleg_state dstate'"
+      also from f3 have "\<dots> = val_acnt acnt + val_utxo_state utxo_st' + val_deleg_state dstate"
         by simp
-      also from f3 have "\<dots> = val_utxo_state utxo_st + val_acnt acnt + val_deleg_state dstate"
+      also from f2 have "\<dots> = val_utxo_state utxo_st + val_acnt acnt + val_deleg_state dstate"
         by simp
       also from \<open>(utxo_st, (dstate, pstate)) = ls\<close> have "\<dots> = val_acnt acnt + val_ledger_state ls"
         by auto
