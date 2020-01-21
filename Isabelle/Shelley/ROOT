@@ -17,6 +17,7 @@ session Shelley (ledgerformalization) = HOL +
     Delegation
     Ledger
     Rewards
+    Chain
     Properties
   document_files
     "root.tex"

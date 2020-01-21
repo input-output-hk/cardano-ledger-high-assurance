@@ -8,6 +8,10 @@ text \<open> Protocol parameter name \<close>
 
 typedecl ppm \<comment> \<open>NOTE: Abstract for now\<close>
 
+text \<open> Duration difference between slots \<close>
+
+type_synonym duration = nat
+
 text \<open> Protocol parameter value \<close>
 
 typedecl pvalue \<comment> \<open>NOTE: Abstract for now\<close>
@@ -32,9 +36,14 @@ consts active_slot_coeff :: "p_params \<Rightarrow> real" \<comment> \<open>[0, 
 
 text \<open> Global Constants \<close>
 
-consts slots_per_epoch :: nat
+consts slots_per_epoch :: nat \<comment> \<open>slots per epoch\<close>
+
+consts start_rewards :: duration \<comment> \<open>duration to start reward calculations\<close>
 
 text \<open> Helper Functions \<close>
+
+fun epoch :: "slot \<Rightarrow> epoch" where
+  "epoch s = undefined" \<comment> \<open>NOTE: Undefined for now\<close>
 
 fun first_slot :: "epoch \<Rightarrow> slot" where
   "first_slot e = undefined" \<comment> \<open>NOTE: Undefined for now\<close>

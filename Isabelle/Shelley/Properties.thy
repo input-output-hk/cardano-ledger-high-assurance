@@ -1,7 +1,7 @@
 section \<open> Properties \<close>
 
 theory Properties
-  imports UTxO Delegation Rewards Ledger
+  imports UTxO Delegation Rewards Ledger Chain
 begin
 
 subsection \<open> Preservation of Value \<close>
@@ -63,8 +63,13 @@ next
   qed
   also from fmupd.prems and fmupd.IH have "\<dots> = val_map m\<^sub>1 + val_map m\<^sub>2 + c"
     by simp
-  also from fmupd.hyps have "\<dots> = val_map m\<^sub>1 + val_map (m\<^sub>2(k $$:= c))"
-    using val_map_add by (smt sum.cong)
+  also have "\<dots> = val_map m\<^sub>1 + val_map (m\<^sub>2(k $$:= c))"
+  proof -
+    from fmupd.hyps have "val_map m\<^sub>2(k $$:= c) = val_map m\<^sub>2 + c"
+      using val_map_add by simp
+    then show ?thesis
+      by simp
+  qed
   finally show ?case .
 qed
 
@@ -135,10 +140,12 @@ proof -
       also have "\<dots> = val_map (fmmap snd (txins tx \<lhd>/ utxo)) + val_map (fmmap snd (outs tx))"
       proof -
         from \<open>txid tx \<notin> {tid | tid ix. (tid, ix) \<in> fmdom' utxo}\<close>
-        have "fmdom'(txins tx \<lhd>/ utxo) \<inter> fmdom' (outs tx) = {}"
+        have "fmdom' (txins tx \<lhd>/ utxo) \<inter> fmdom' (outs tx) = {}"
           using txins_outs_exc by blast
+        then have "fmdom' (fmmap snd (txins tx \<lhd>/ utxo)) \<inter> fmdom' (fmmap snd (outs tx)) = {}"
+          by simp
         then show ?thesis
-          using val_map_union by (smt fmdom'_map sum.cong)
+          using val_map_union by blast
       qed
       also have "\<dots> = ubalance (txins tx \<lhd>/ utxo) + ubalance (outs tx)"
         using val_utxo_val_map by presburger
@@ -1020,7 +1027,6 @@ proof -
   qed
 qed
 
-
 lemma epoch_value_preservation:
   assumes "\<turnstile> s \<rightarrow>\<^bsub>EPOCH\<^esub>{\<epsilon>} s'"
   shows "val_epoch_state s = val_epoch_state s'"
@@ -1079,5 +1085,106 @@ proof -
   qed
 qed
 
+fun val_new_epoch_state :: "new_epoch_state \<Rightarrow> coin" where
+  "val_new_epoch_state (_, _, _, es, _, _, _) = val_epoch_state es"
+
+lemma newepoch_value_preservation:
+  assumes "e \<turnstile> s \<rightarrow>\<^bsub>NEWEPOCH\<^esub>{\<epsilon>} s'"
+  and "inj addr_rwd"
+  and "mono addr_rwd"
+  shows "val_new_epoch_state s = val_new_epoch_state s'"
+proof -
+  from assms show ?thesis
+  proof cases
+    case (new_epoch e\<^sub>l ru ru' b\<^sub>p\<^sub>r\<^sub>e\<^sub>v es es' pd' osched' b\<^sub>c\<^sub>u\<^sub>r pd osched)
+    have "val_epoch_state es' = val_epoch_state es"
+    proof -
+      from \<open>inj addr_rwd\<close> and \<open>mono addr_rwd\<close> and \<open>ru' = create_r_upd b\<^sub>p\<^sub>r\<^sub>e\<^sub>v es\<close> have "
+        val_epoch_state (apply_r_upd ru' es) = val_epoch_state es"
+        using reward_update_value_preservation by presburger
+      with \<open>\<turnstile> apply_r_upd ru' es \<rightarrow>\<^bsub>EPOCH\<^esub>{\<epsilon>} es'\<close> show ?thesis
+        using epoch_value_preservation by simp
+    qed
+    with \<open>s = (e\<^sub>l, b\<^sub>p\<^sub>r\<^sub>e\<^sub>v, b\<^sub>c\<^sub>u\<^sub>r, es, ru, pd, osched)\<close> and
+      \<open>s' = (\<epsilon>, b\<^sub>c\<^sub>u\<^sub>r, {$$}, es', None, pd', osched')\<close> show ?thesis
+      by simp
+  next
+    case not_new_epoch
+    then show ?thesis by simp
+  next
+    case no_reward_update
+    then show ?thesis by simp
+  qed
+qed
+
+lemma tick_value_preservation:
+  assumes "gkeys \<turnstile> nes \<rightarrow>\<^bsub>TICK\<^esub>{s} nes'"
+  and "inj addr_rwd"
+  and "mono addr_rwd"
+  shows "val_new_epoch_state nes = val_new_epoch_state nes'"
+proof -
+  from assms show ?thesis
+  proof cases
+    case (tick nes'' _ b\<^sub>p\<^sub>r\<^sub>e\<^sub>v _ es _ _ _ e\<^sub>l'' b\<^sub>p\<^sub>r\<^sub>e\<^sub>v'' b\<^sub>c\<^sub>u\<^sub>r'' es'' ru pd'' osched'' ru'')
+    from assms and \<open>(s, gkeys) \<turnstile> nes \<rightarrow>\<^bsub>NEWEPOCH\<^esub>{epoch s} nes''\<close> have "
+      val_new_epoch_state nes = val_new_epoch_state nes''"
+      using newepoch_value_preservation by simp
+    also from \<open>nes' = (e\<^sub>l'', b\<^sub>p\<^sub>r\<^sub>e\<^sub>v'', b\<^sub>c\<^sub>u\<^sub>r'', es'', ru'', pd'', osched'')\<close> and
+      \<open>(e\<^sub>l'', b\<^sub>p\<^sub>r\<^sub>e\<^sub>v'', b\<^sub>c\<^sub>u\<^sub>r'', es'', ru, pd'', osched'') = nes''\<close> have "
+      \<dots> = val_new_epoch_state nes'"
+      by auto
+    finally show ?thesis .
+  qed
+qed
+
+fun val_b_body_state :: "b_body_state \<Rightarrow> coin" where
+  "val_b_body_state (ls, _) = val_ledgers_state ls"
+
+lemma bbody_value_preservation:
+  assumes "e \<turnstile> s \<rightarrow>\<^bsub>BBODY\<^esub>{block} s'"
+  shows "val_b_body_state s = val_b_body_state s'"
+proof -
+  from assms show ?thesis
+  proof cases
+    case (block_body txs bhb hk pp reserves ls ls' oslots b)
+    from \<open>(bslot bhb, pp, reserves) \<turnstile> ls \<rightarrow>\<^bsub>LEDGERS\<^esub>{txs} ls'\<close> have "
+      val_ledgers_state ls = val_ledgers_state ls'"
+      using ledgers_value_preservation by simp
+    with \<open>s = (ls, b)\<close> and \<open>s' = (ls', incr_blocks (bslot bhb \<in> oslots) hk b)\<close> have "
+      val_b_body_state s = val_b_body_state s'"
+      by simp
+    then show ?thesis .
+  qed
+qed
+
+fun val_chain_state :: "chain_state \<Rightarrow> coin" where
+  "val_chain_state s = val_new_epoch_state (fst s)"
+
+theorem chain_value_preservation:
+  assumes "e \<turnstile> s \<rightarrow>\<^bsub>CHAIN\<^esub>{block} s'"
+  and "inj addr_rwd"
+  and "mono addr_rwd"
+  shows "val_chain_state s = val_chain_state s'"
+proof -
+  from assms show ?thesis
+  proof cases
+    case (chain bh bhb gkeys nes slot _ _ _ _ _ _ pp _ _ _ nes' _ _ b\<^sub>c\<^sub>u\<^sub>r es _ _ osched acnt _ ls pp'
+        _ reserves ls' b'\<^sub>c\<^sub>u\<^sub>r nes'' cs' \<eta>'\<^sub>0 \<eta>'\<^sub>v \<eta>'\<^sub>c \<eta>'\<^sub>h h' s'\<^sub>l cs \<eta>\<^sub>0 \<eta>\<^sub>v \<eta>\<^sub>c \<eta>\<^sub>h h s\<^sub>l)
+    from \<open>gkeys \<turnstile> nes \<rightarrow>\<^bsub>TICK\<^esub>{slot} nes'\<close> and \<open>inj addr_rwd\<close> and \<open>mono addr_rwd\<close> have "
+      val_new_epoch_state nes = val_new_epoch_state nes'"
+      using tick_value_preservation by simp
+    moreover from \<open>(fmdom' osched, pp', reserves) \<turnstile> (ls, b\<^sub>c\<^sub>u\<^sub>r) \<rightarrow>\<^bsub>BBODY\<^esub>{block} (ls', b'\<^sub>c\<^sub>u\<^sub>r)\<close> have "
+      val_ledgers_state ls = val_ledgers_state ls'"
+      using bbody_value_preservation by (blast dest: val_b_body_state.elims)
+    ultimately show ?thesis
+      using
+        \<open>s = (nes, cs, \<eta>\<^sub>0, \<eta>\<^sub>v, \<eta>\<^sub>c, \<eta>\<^sub>h, h, s\<^sub>l)\<close> and
+        \<open>(_, _, b\<^sub>c\<^sub>u\<^sub>r, es, _, _, osched) = nes'\<close> and
+        \<open>(acnt, _, ls, pp') = es\<close> and
+        \<open>nes'' = update_nes nes' b'\<^sub>c\<^sub>u\<^sub>r ls'\<close> and
+        \<open>s' = (nes'', cs', \<eta>'\<^sub>0, \<eta>'\<^sub>v, \<eta>'\<^sub>c, \<eta>'\<^sub>h, h', s'\<^sub>l)\<close>
+      by auto
+  qed
+qed
 
 end

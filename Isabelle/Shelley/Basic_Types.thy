@@ -1,12 +1,12 @@
 section \<open> Basic Types \<close>
 
 theory Basic_Types
-  imports "HOL-Library.Countable"
+  imports Main
 begin
 
 text \<open> Epoch \<close>
 
-typedecl epoch
+type_synonym epoch = nat
 
 text \<open> Unit of value \<close>
 
@@ -18,7 +18,7 @@ type_synonym ix = nat
 
 text \<open> Absolute slot \<close>
 
-typedecl slot
+type_synonym slot = nat
 
 text \<open> Application versions \<close>
 
