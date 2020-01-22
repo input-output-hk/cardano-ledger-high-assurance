@@ -438,18 +438,25 @@ next
   qed
 qed
 
-lemma dom_res_union_distr: (* TODO: Find a nicer proof *)
+lemma dom_res_union_distr:
   shows "(A \<union> B) \<lhd> m = A \<lhd> m ++\<^sub>f B \<lhd> m"
 proof -
-  have "(A \<union> B) \<lhd> m \<subseteq>\<^sub>f A \<lhd> m ++\<^sub>f B \<lhd> m"
-    by (smt Un_iff domIff dom_fmlookup fmdom'_add fmdom'_filter fmfilter_subset fmlookup_add
-        fmsubset.rep_eq map_le_def member_filter)
-  moreover have "A \<lhd> m ++\<^sub>f B \<lhd> m \<subseteq>\<^sub>f (A \<union> B) \<lhd> m"
-    by (smt Un_iff domIff dom_fmlookup fmdom'_filter fmfilter_subset fmlookup_add fmsubset.rep_eq
-        map_le_def member_filter)
+  have "($$) ((A \<union> B) \<lhd> m) \<subseteq>\<^sub>m ($$) (A \<lhd> m ++\<^sub>f B \<lhd> m)"
+  proof (unfold map_le_def, intro ballI)
+    fix k
+    assume "k \<in> dom (($$) ((A \<union> B) \<lhd> m))"
+    then show "((A \<union> B) \<lhd> m) $$ k = (A \<lhd> m ++\<^sub>f B \<lhd> m) $$ k"
+      by auto
+  qed
+  moreover have "($$) (A \<lhd> m ++\<^sub>f B \<lhd> m) \<subseteq>\<^sub>m ($$) ((A \<union> B) \<lhd> m)"
+  proof (unfold map_le_def, intro ballI)
+    fix k
+    assume "k \<in> dom (($$) (A \<lhd> m ++\<^sub>f B \<lhd> m))"
+    then show "(A \<lhd> m ++\<^sub>f B \<lhd> m) $$ k = ((A \<union> B) \<lhd> m) $$ k"
+      by auto
+  qed
   ultimately show ?thesis
-    by (smt Un_iff domIff dom_fmlookup fmadd_empty(2) fmdiff_partition fmdom'_add fmfilter_false
-        option.simps(3))
+    using fmlookup_inject and map_le_antisym by blast
 qed
 
 lemma dom_exc_add_distr:
