@@ -186,13 +186,13 @@ inductive newpp_sts :: "new_p_param_env \<Rightarrow> new_p_param_state \<Righta
       if "opp\<^sub>n\<^sub>e\<^sub>w = Some pp\<^sub>n\<^sub>e\<^sub>w"
       and "(treasury, reserves) = acnt"
       and "\<not> newpp_accepted pp\<^sub>n\<^sub>e\<^sub>w pp dstate pstate e reserves"
-      and "(utxo, deps, fees, (pup, aup, favs, avs)) = utxo_st"
-      and "utxo_st' = (utxo, deps, fees, ({$$}, aup, favs, avs))"
+      and "(utxo, oblg, fees, (pup, aup, favs, avs)) = utxo_st"
+      and "utxo_st' = (utxo, oblg, fees, ({$$}, aup, favs, avs))"
   | new_proto_param_denied_2: "
       (opp\<^sub>n\<^sub>e\<^sub>w, dstate, pstate) \<turnstile> (utxo_st, acnt, pp) \<rightarrow>\<^bsub>NEWPP\<^esub>{e} (utxo_st', acnt, pp)"
       if "opp\<^sub>n\<^sub>e\<^sub>w = None"
-      and "(utxo, deps, fees, (pup, aup, favs, avs)) = utxo_st"
-      and "utxo_st' = (utxo, deps, fees, ({$$}, aup, favs, avs))"
+      and "(utxo, oblg, fees, (pup, aup, favs, avs)) = utxo_st"
+      and "utxo_st' = (utxo, oblg, fees, ({$$}, aup, favs, avs))"
 
 subsection \<open> Complete Epoch Boundary Transition \<close>
 

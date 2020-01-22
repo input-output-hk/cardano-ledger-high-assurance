@@ -998,15 +998,15 @@ proof -
       by auto
     finally show ?thesis ..
   next
-    case (new_proto_param_denied_1 _ _ treasury reserves acnt pp _ _ utxo deps fees pup aup favs avs
+    case (new_proto_param_denied_1 _ _ treasury reserves acnt pp _ _ utxo oblg fees pup aup favs avs
         utxo_st utxo_st')
     from \<open>s' = (utxo_st', acnt, pp)\<close> and \<open>(treasury, reserves) = acnt\<close>
     have "val_newpp_state s' = val_utxo_state utxo_st' + val_coin treasury + val_coin reserves"
       by auto
-    also from \<open>utxo_st' = (utxo, deps, fees, {$$}, aup, favs, avs)\<close> have "\<dots> =
-      val_utxo utxo + deps + fees + val_coin treasury + val_coin reserves"
+    also from \<open>utxo_st' = (utxo, oblg, fees, {$$}, aup, favs, avs)\<close> have "\<dots> =
+      val_utxo utxo + oblg + fees + val_coin treasury + val_coin reserves"
       by simp
-    also from \<open>(utxo, deps, fees, pup, aup, favs, avs) = utxo_st\<close> have "\<dots> =
+    also from \<open>(utxo, oblg, fees, pup, aup, favs, avs) = utxo_st\<close> have "\<dots> =
       val_utxo_state utxo_st + treasury + reserves"
       by auto
     also from \<open>(treasury, reserves) = acnt\<close> and \<open>s = (utxo_st, acnt, pp)\<close> have "\<dots> =
@@ -1014,14 +1014,14 @@ proof -
       by auto
     finally show ?thesis ..
   next
-    case (new_proto_param_denied_2 _ utxo deps fees pup aup favs avs utxo_st utxo_st' _ _ acnt pp)
+    case (new_proto_param_denied_2 _ utxo oblg fees pup aup favs avs utxo_st utxo_st' _ _ acnt pp)
     from \<open>s' = (utxo_st', acnt, pp)\<close> have "val_newpp_state s' =
       val_utxo_state utxo_st' + val_acnt acnt"
       by simp
-    also from \<open>utxo_st' = (utxo, deps, fees, {$$}, aup, favs, avs)\<close> have "\<dots> =
-      val_utxo utxo + val_coin deps + val_coin fees + val_acnt acnt"
+    also from \<open>utxo_st' = (utxo, oblg, fees, {$$}, aup, favs, avs)\<close> have "\<dots> =
+      val_utxo utxo + val_coin oblg + val_coin fees + val_acnt acnt"
       by simp
-    also from \<open>(utxo, deps, fees, pup, aup, favs, avs) = utxo_st\<close> and \<open>s = (utxo_st, acnt, pp)\<close>
+    also from \<open>(utxo, oblg, fees, pup, aup, favs, avs) = utxo_st\<close> and \<open>s = (utxo_st, acnt, pp)\<close>
     have "\<dots> = val_newpp_state s"
       by auto
     finally show ?thesis ..
@@ -1126,12 +1126,12 @@ lemma tick_value_preservation:
 proof -
   from assms show ?thesis
   proof cases
-    case (tick nes'' _ b\<^sub>p\<^sub>r\<^sub>e\<^sub>v _ es _ _ _ e\<^sub>l'' b\<^sub>p\<^sub>r\<^sub>e\<^sub>v'' b\<^sub>c\<^sub>u\<^sub>r'' es'' ru pd'' osched'' ru'')
+    case (tick nes'' _ b\<^sub>p\<^sub>r\<^sub>e\<^sub>v _ es _ _ _ e\<^sub>l'' b\<^sub>p\<^sub>r\<^sub>e\<^sub>v'' b\<^sub>c\<^sub>u\<^sub>r'' es'' ru' pd'' osched'' ru'')
     from assms and \<open>(s, gkeys) \<turnstile> nes \<rightarrow>\<^bsub>NEWEPOCH\<^esub>{epoch s} nes''\<close> have "
       val_new_epoch_state nes = val_new_epoch_state nes''"
       using newepoch_value_preservation by simp
     also from \<open>nes' = (e\<^sub>l'', b\<^sub>p\<^sub>r\<^sub>e\<^sub>v'', b\<^sub>c\<^sub>u\<^sub>r'', es'', ru'', pd'', osched'')\<close> and
-      \<open>(e\<^sub>l'', b\<^sub>p\<^sub>r\<^sub>e\<^sub>v'', b\<^sub>c\<^sub>u\<^sub>r'', es'', ru, pd'', osched'') = nes''\<close> have "
+      \<open>(e\<^sub>l'', b\<^sub>p\<^sub>r\<^sub>e\<^sub>v'', b\<^sub>c\<^sub>u\<^sub>r'', es'', ru', pd'', osched'') = nes''\<close> have "
       \<dots> = val_new_epoch_state nes'"
       by auto
     finally show ?thesis .

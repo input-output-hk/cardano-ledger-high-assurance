@@ -139,9 +139,9 @@ inductive tick_sts :: "key_hash_g set \<Rightarrow> new_epoch_state \<Rightarrow
       gkeys \<turnstile> nes \<rightarrow>\<^bsub>TICK\<^esub>{s} nes''"
       if "(s, gkeys) \<turnstile> nes \<rightarrow>\<^bsub>NEWEPOCH\<^esub>{epoch s} nes'"
       and "(_, b\<^sub>p\<^sub>r\<^sub>e\<^sub>v, _, es, _, _, _) = nes"
-      and "(e\<^sub>l', b\<^sub>p\<^sub>r\<^sub>e\<^sub>v', b\<^sub>c\<^sub>u\<^sub>r', es', ru, pd', osched') = nes'"
-      and "(b\<^sub>p\<^sub>r\<^sub>e\<^sub>v, es) \<turnstile> ru \<rightarrow>\<^bsub>RUPD\<^esub>{s} ru'"
-      and "nes'' = (e\<^sub>l', b\<^sub>p\<^sub>r\<^sub>e\<^sub>v', b\<^sub>c\<^sub>u\<^sub>r', es', ru', pd', osched')"
+      and "(e\<^sub>l', b\<^sub>p\<^sub>r\<^sub>e\<^sub>v', b\<^sub>c\<^sub>u\<^sub>r', es', ru', pd', osched') = nes'"
+      and "(b\<^sub>p\<^sub>r\<^sub>e\<^sub>v, es) \<turnstile> ru' \<rightarrow>\<^bsub>RUPD\<^esub>{s} ru''"
+      and "nes'' = (e\<^sub>l', b\<^sub>p\<^sub>r\<^sub>e\<^sub>v', b\<^sub>c\<^sub>u\<^sub>r', es', ru'', pd', osched')"
 
 subsection \<open> Block Body Transition \<close>
 
