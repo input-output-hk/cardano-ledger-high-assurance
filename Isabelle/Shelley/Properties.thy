@@ -747,7 +747,8 @@ next
 qed
 
 \<comment> \<open>NOTE: Lemma 15.9 in the spec.\<close>
-\<comment> \<open>NOTE: We require \<open>addr_rwd\<close> to be monotonic, which is a minor deviation from the spec.\<close>
+\<comment> \<open>NOTE: We require \<open>addr_rwd\<close> to be monotonic, which is a minor (though sensible) deviation from
+the spec.\<close>
 lemma reward_update_value_preservation:
   assumes "inj addr_rwd"
   and "mono addr_rwd"

@@ -7,17 +7,17 @@ begin
 text \<open> Extra lemmas and syntactic sugar for \<open>fmap\<close> \<close>
 
 abbreviation fmap_update (\<open>_'(_ $$:= _')\<close> [1000,0,0] 1000) where
-  "fmap_update m k v \<equiv> fmupd k v m"
+  "m(k $$:= v) \<equiv> fmupd k v m"
 
 notation fmlookup (infixl \<open>$$\<close> 999)
 
 notation fmempty (\<open>{$$}\<close>)
 
 abbreviation fmap_singleton (\<open>{_ $$:= _}\<close> [0, 0] 1000) where
-  "fmap_singleton k v \<equiv> {$$}(k $$:= v)"
+  "{k $$:= v} \<equiv> {$$}(k $$:= v)"
 
 abbreviation fmap_lookup_the (infixl \<open>$$!\<close> 999) where
-  "fmap_lookup_the m k \<equiv> the (m $$ k)"
+  "m $$! k \<equiv> the (m $$ k)"
 
 lemma fmfilter_fmsubset: "fmfilter p m \<subseteq>\<^sub>f m"
 proof -
@@ -153,7 +153,7 @@ proof -
       by (metis (mono_tags, lifting) fmdom'_alt_def map_eq_conv sorted_list_of_fset_simps(1))
   qed
   finally show ?thesis
-    by (simp add: sorted_list_of_fmap_def)
+    unfolding sorted_list_of_fmap_def by simp
 qed
 
 lemma distinct_fst_inj:

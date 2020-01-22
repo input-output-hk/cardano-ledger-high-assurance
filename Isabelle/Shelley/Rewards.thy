@@ -205,7 +205,8 @@ text \<open> Epoch Inference Rule \<close>
 inductive epoch_sts :: "epoch_state \<Rightarrow> epoch \<Rightarrow> epoch_state \<Rightarrow> bool"
   (\<open>\<turnstile> _ \<rightarrow>\<^bsub>EPOCH\<^esub>{_} _\<close> [0, 51] 50)
   where
-    epoch: "\<turnstile> (acnt, ss, ls, pp) \<rightarrow>\<^bsub>EPOCH\<^esub>{e} (acnt'', ss', ls', pp')"
+    epoch: "
+      \<turnstile> (acnt, ss, ls, pp) \<rightarrow>\<^bsub>EPOCH\<^esub>{e} (acnt'', ss', ls', pp')"
       if "(utxo_st, (dstate, pstate)) = ls"
       and "(pp, dstate, pstate) \<turnstile> (ss, utxo_st) \<rightarrow>\<^bsub>SNAP\<^esub>{e} (ss', utxo_st')"
       and "pp \<turnstile> (utxo_st', acnt, dstate, pstate) \<rightarrow>\<^bsub>POOLREAP\<^esub>{e} (utxo_st'', acnt', dstate', pstate')"

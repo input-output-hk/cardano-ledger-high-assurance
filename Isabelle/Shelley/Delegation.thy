@@ -98,7 +98,7 @@ inductive delegs_sts :: "d_p_s_env \<Rightarrow> d_p_state \<Rightarrow> d_cert 
       if "wdrls = txwdrls tx"
       and "wdrls \<subseteq>\<^sub>f rewards"
       and "rewards' = rewards \<union>\<^sub>\<rightarrow> fmmap (\<lambda>_. 0) wdrls"
-    | seq_delg_ind: "
+  | seq_delg_ind: "
       (slot, tx) \<turnstile> dpstate \<rightarrow>\<^bsub>DELEGS\<^esub>{\<Gamma> @ [c]} dpstate''"
       if "(slot, tx) \<turnstile> dpstate \<rightarrow>\<^bsub>DELEGS\<^esub>{\<Gamma>} dpstate'"
       and "slot \<turnstile> dpstate' \<rightarrow>\<^bsub>DELPL\<^esub>{c} dpstate''"
