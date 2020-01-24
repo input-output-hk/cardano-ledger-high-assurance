@@ -752,43 +752,51 @@ the spec.\<close>
 lemma reward_update_value_preservation:
   assumes "inj addr_rwd"
   and "mono addr_rwd"
-  shows "val_epoch_state s = val_epoch_state (apply_r_upd (create_r_upd b s) s)"
+  shows "val_epoch_state s\<^sub>2 = val_epoch_state (apply_r_upd (create_r_upd b s\<^sub>1) s\<^sub>2)"
 proof -
-  obtain treasury reserves ss utxo deps fees up stk_creds rewards i\<^sub>r\<^sub>w\<^sub>d pstate ppm
-    where f1: "s =
+  obtain treasury\<^sub>1 reserves\<^sub>1 ss\<^sub>1 utxo\<^sub>1 deps\<^sub>1 fees\<^sub>1 up\<^sub>1 stk_creds\<^sub>1 rewards\<^sub>1 i\<^sub>r\<^sub>w\<^sub>d pstate\<^sub>1 ppm\<^sub>1
+    where f0: "s\<^sub>1 =
+      (
+        (treasury\<^sub>1, reserves\<^sub>1),
+        ss\<^sub>1,
+        ((utxo\<^sub>1, deps\<^sub>1, fees\<^sub>1, up\<^sub>1), ((stk_creds\<^sub>1, rewards\<^sub>1, i\<^sub>r\<^sub>w\<^sub>d), pstate\<^sub>1)),
+        ppm\<^sub>1
+      )"
+    by (metis old.prod.exhaust val_deleg_state.cases)
+  then obtain \<Delta>t \<Delta>r rs \<Delta>f where f1: "create_r_upd b s\<^sub>1 = (\<Delta>t, \<Delta>r, rs, \<Delta>f, i\<^sub>r\<^sub>w\<^sub>d)"
+    unfolding Let_def using create_r_upd.elims and get_ir.simps by metis
+  moreover obtain treasury reserves ss utxo deps fees up stk_creds rewards i'\<^sub>r\<^sub>w\<^sub>d pstate ppm
+    where f2: "s\<^sub>2 =
       (
         (treasury, reserves),
         ss,
-        ((utxo, deps, fees, up), ((stk_creds, rewards, i\<^sub>r\<^sub>w\<^sub>d), pstate)),
+        ((utxo, deps, fees, up), ((stk_creds, rewards, i'\<^sub>r\<^sub>w\<^sub>d), pstate)),
         ppm
       )"
     by (metis old.prod.exhaust val_deleg_state.cases)
-  moreover obtain \<Delta>t \<Delta>r rs \<Delta>f rew\<^sub>m\<^sub>i\<^sub>r where f2: "create_r_upd b s = (\<Delta>t, \<Delta>r, rs, \<Delta>f, rew\<^sub>m\<^sub>i\<^sub>r)"
-    using prod_cases5 by blast
   ultimately obtain non_distributed and rew'\<^sub>m\<^sub>i\<^sub>r and update\<^sub>r\<^sub>w\<^sub>d and unregistered
-    where f3: "apply_r_upd (\<Delta>t, \<Delta>r, rs, \<Delta>f, rew\<^sub>m\<^sub>i\<^sub>r) s =
+    where f3: "apply_r_upd (\<Delta>t, \<Delta>r, rs, \<Delta>f, i\<^sub>r\<^sub>w\<^sub>d) s\<^sub>2 =
       (
         (treasury + \<Delta>t, reserves + \<Delta>r + non_distributed),
         ss,
         ((utxo, deps, fees + \<Delta>f, up), ((stk_creds, (rewards \<union>\<^sub>+ rs) \<union>\<^sub>+ update\<^sub>r\<^sub>w\<^sub>d, {$$}), pstate)),
         ppm
       )"
-      and f4: "non_distributed =
-        (\<Sum>k \<in> fmdom' (fmdom' stk_creds \<lhd>/ rew\<^sub>m\<^sub>i\<^sub>r). (fmdom' stk_creds \<lhd>/ rew\<^sub>m\<^sub>i\<^sub>r) $$! k)"
-      and f5: "rew'\<^sub>m\<^sub>i\<^sub>r = fmdom' stk_creds \<lhd> rew\<^sub>m\<^sub>i\<^sub>r"
+      and f7: "unregistered = fmdom' stk_creds \<lhd>/ i\<^sub>r\<^sub>w\<^sub>d"
+      and f4: "non_distributed = (\<Sum>k \<in> fmdom' unregistered. unregistered $$! k)"
+      and f5: "rew'\<^sub>m\<^sub>i\<^sub>r = fmdom' stk_creds \<lhd> i\<^sub>r\<^sub>w\<^sub>d"
       and f6: "update\<^sub>r\<^sub>w\<^sub>d = fmap_of_list [(addr_rwd hk, val). (hk, val) \<leftarrow> sorted_list_of_fmap rew'\<^sub>m\<^sub>i\<^sub>r]"
-      and f7: "unregistered = fmdom' stk_creds \<lhd>/ rew\<^sub>m\<^sub>i\<^sub>r"
     by (metis apply_r_upd.simps)
-  then have "val_epoch_state (apply_r_upd (create_r_upd b s) s) =
+  then have "val_epoch_state (apply_r_upd (create_r_upd b s\<^sub>1) s\<^sub>2) =
     treasury + reserves + val_utxo utxo + deps + fees + val_map rewards + \<Delta>t + \<Delta>r + non_distributed
     + \<Delta>f + val_map rs + val_map update\<^sub>r\<^sub>w\<^sub>d"
   proof -
-    from f2 and f3 have "val_epoch_state (apply_r_upd (create_r_upd b s) s) =
+    from f1 and f3 have "val_epoch_state (apply_r_upd (create_r_upd b s\<^sub>1) s\<^sub>2) =
       val_acnt (treasury + \<Delta>t, reserves + \<Delta>r + non_distributed)
       + val_ledger_state (
         (utxo, deps, fees + \<Delta>f, up), ((stk_creds, (rewards \<union>\<^sub>+ rs) \<union>\<^sub>+ update\<^sub>r\<^sub>w\<^sub>d, {$$}), pstate))"
       by simp
-    then have "val_epoch_state (apply_r_upd (create_r_upd b s) s) =
+    then have "val_epoch_state (apply_r_upd (create_r_upd b s\<^sub>1) s\<^sub>2) =
       (treasury + \<Delta>t) + (reserves + \<Delta>r + non_distributed) + val_utxo utxo + deps + (fees + \<Delta>f)
       + val_map ((rewards \<union>\<^sub>+ rs) \<union>\<^sub>+ update\<^sub>r\<^sub>w\<^sub>d)"
       by auto
@@ -799,28 +807,26 @@ proof -
       by linarith
   qed
   moreover have "\<Delta>t + \<Delta>r + non_distributed + \<Delta>f + val_map rs + val_map update\<^sub>r\<^sub>w\<^sub>d = 0"
-  proof (cases ss)
+  proof (cases ss\<^sub>1)
     case (fields pstake\<^sub>m\<^sub>a\<^sub>r\<^sub>k pstake\<^sub>s\<^sub>e\<^sub>t pstake\<^sub>g\<^sub>o pools_ss fee_ss)
-    from f1 and fields have "s =
+    from f0 and fields have "s\<^sub>1 =
       (
-        (treasury, reserves),
+        (treasury\<^sub>1, reserves\<^sub>1),
         (pstake\<^sub>m\<^sub>a\<^sub>r\<^sub>k, pstake\<^sub>s\<^sub>e\<^sub>t, pstake\<^sub>g\<^sub>o, pools_ss, fee_ss),
-        ((utxo, deps, fees, up), (stk_creds, rewards, i\<^sub>r\<^sub>w\<^sub>d), pstate),
-        ppm
+        ((utxo\<^sub>1, deps\<^sub>1, fees\<^sub>1, up\<^sub>1), (stk_creds\<^sub>1, rewards\<^sub>1, i\<^sub>r\<^sub>w\<^sub>d), pstate\<^sub>1),
+        ppm\<^sub>1
       )"
       by simp
-    then obtain \<Delta>t\<^sub>1 \<Delta>t\<^sub>2 \<Delta>r' \<Delta>r\<^sub>l rs' rewards\<^sub>m\<^sub>i\<^sub>r registered unregistered' reward_pot R
-      where "create_r_upd b s = (\<Delta>t\<^sub>1 + \<Delta>t\<^sub>2, -\<Delta>r', rs', -fee_ss, registered)"
-      and "unregistered' = fmdom' stk_creds \<lhd>/ i\<^sub>r\<^sub>w\<^sub>d"
-      and "registered = i\<^sub>r\<^sub>w\<^sub>d --\<^sub>f unregistered'"
-      and "rewards\<^sub>m\<^sub>i\<^sub>r = (\<Sum> k \<in> fmdom' registered. registered $$! k)"
+    then obtain \<Delta>t\<^sub>1 \<Delta>t\<^sub>2 \<Delta>r' \<Delta>r\<^sub>l rs' rewards\<^sub>m\<^sub>i\<^sub>r reward_pot R
+      where "create_r_upd b s\<^sub>1 = (\<Delta>t\<^sub>1 + \<Delta>t\<^sub>2, -\<Delta>r', rs', -fee_ss, i\<^sub>r\<^sub>w\<^sub>d)"
+      and "rewards\<^sub>m\<^sub>i\<^sub>r = (\<Sum> k \<in> fmdom' i\<^sub>r\<^sub>w\<^sub>d. i\<^sub>r\<^sub>w\<^sub>d $$! k)"
       and "reward_pot = fee_ss + \<Delta>r\<^sub>l"
       and "R = reward_pot - \<Delta>t\<^sub>1"
       and "\<Delta>t\<^sub>2 = R - (\<Sum> k \<in> fmdom' rs'. rs' $$! k)"
       and "\<Delta>r' = \<Delta>r\<^sub>l + rewards\<^sub>m\<^sub>i\<^sub>r"
       by (metis create_r_upd.simps prod.exhaust_sel that)
     with f1 and f2 and fields have "rs' = rs" and "\<Delta>r' = -\<Delta>r" and "\<Delta>t = \<Delta>t\<^sub>1 + \<Delta>t\<^sub>2"
-      and "\<Delta>f = -fee_ss" and "registered = rew\<^sub>m\<^sub>i\<^sub>r"
+      and "\<Delta>f = -fee_ss"
       by auto
     with \<open>R = reward_pot - \<Delta>t\<^sub>1\<close> and \<open>\<Delta>t\<^sub>2 = R - val_map rs'\<close> and \<open>reward_pot = fee_ss + \<Delta>r\<^sub>l\<close>
     have "\<Delta>t\<^sub>1 + \<Delta>t\<^sub>2 - \<Delta>r\<^sub>l + val_map rs - fee_ss = 0"
@@ -828,42 +834,42 @@ proof -
     from \<open>\<Delta>t = \<Delta>t\<^sub>1 + \<Delta>t\<^sub>2\<close> have "\<Delta>t + \<Delta>r + non_distributed + \<Delta>f + val_map rs + val_map update\<^sub>r\<^sub>w\<^sub>d =
       \<Delta>t\<^sub>1 + \<Delta>t\<^sub>2 + \<Delta>r + non_distributed + \<Delta>f + val_map rs + val_map update\<^sub>r\<^sub>w\<^sub>d"
       by simp
-    also from \<open>\<Delta>r' = \<Delta>r\<^sub>l + rewards\<^sub>m\<^sub>i\<^sub>r\<close> and \<open>\<Delta>r' = -\<Delta>r\<close> and \<open>rewards\<^sub>m\<^sub>i\<^sub>r = val_map registered\<close>
-    have "\<dots> = \<Delta>t\<^sub>1 + \<Delta>t\<^sub>2 - \<Delta>r\<^sub>l - val_map registered + non_distributed + \<Delta>f + val_map rs
+    also from \<open>\<Delta>r' = \<Delta>r\<^sub>l + rewards\<^sub>m\<^sub>i\<^sub>r\<close> and \<open>\<Delta>r' = -\<Delta>r\<close> and \<open>rewards\<^sub>m\<^sub>i\<^sub>r = val_map i\<^sub>r\<^sub>w\<^sub>d\<close>
+    have "\<dots> = \<Delta>t\<^sub>1 + \<Delta>t\<^sub>2 - \<Delta>r\<^sub>l - val_map i\<^sub>r\<^sub>w\<^sub>d + non_distributed + \<Delta>f + val_map rs
       + val_map update\<^sub>r\<^sub>w\<^sub>d"
       by simp
-    also from \<open>\<Delta>f = -fee_ss\<close> have "\<dots> = \<Delta>t\<^sub>1 + \<Delta>t\<^sub>2 - \<Delta>r\<^sub>l + val_map rs - fee_ss - val_map registered
+    also from \<open>\<Delta>f = -fee_ss\<close> have "\<dots> = \<Delta>t\<^sub>1 + \<Delta>t\<^sub>2 - \<Delta>r\<^sub>l + val_map rs - fee_ss - val_map i\<^sub>r\<^sub>w\<^sub>d
       + non_distributed + val_map update\<^sub>r\<^sub>w\<^sub>d"
       by simp
     also from \<open>\<Delta>t\<^sub>1 + \<Delta>t\<^sub>2 - \<Delta>r\<^sub>l + val_map rs - fee_ss = 0\<close> have "\<dots> =
-      - val_map registered + non_distributed + val_map update\<^sub>r\<^sub>w\<^sub>d"
+      - val_map i\<^sub>r\<^sub>w\<^sub>d + non_distributed + val_map update\<^sub>r\<^sub>w\<^sub>d"
       by simp
     also have "\<dots> = 0"
     proof -
-      have "val_map registered = val_map update\<^sub>r\<^sub>w\<^sub>d + non_distributed"
+      have "val_map i\<^sub>r\<^sub>w\<^sub>d = val_map update\<^sub>r\<^sub>w\<^sub>d + non_distributed"
       proof -
-        from f6 and assms(1,2) have "val_map rew'\<^sub>m\<^sub>i\<^sub>r = val_map update\<^sub>r\<^sub>w\<^sub>d"
-          by (simp add: val_map_fmap_of_list)
-        moreover from f4 and f7 have "val_map unregistered = non_distributed"
-          by simp
-        ultimately have *: "val_map rew'\<^sub>m\<^sub>i\<^sub>r + val_map unregistered =
-          val_map update\<^sub>r\<^sub>w\<^sub>d + non_distributed"
-          by simp
-        from \<open>registered = rew\<^sub>m\<^sub>i\<^sub>r\<close> have "val_map registered = val_map rew\<^sub>m\<^sub>i\<^sub>r"
-          by simp
-        also from f5 and f7 have "\<dots> = val_map rew'\<^sub>m\<^sub>i\<^sub>r + val_map unregistered"
+        have "val_map rew'\<^sub>m\<^sub>i\<^sub>r + val_map unregistered = val_map update\<^sub>r\<^sub>w\<^sub>d + non_distributed"
+        proof -
+          from f6 and assms(1,2) have "val_map rew'\<^sub>m\<^sub>i\<^sub>r = val_map update\<^sub>r\<^sub>w\<^sub>d"
+            by (simp add: val_map_fmap_of_list)
+          moreover from f4 and f7 have "val_map unregistered = non_distributed"
+            by simp
+          ultimately show ?thesis
+            by simp
+        qed
+        moreover from f5 and f7 have "val_map i\<^sub>r\<^sub>w\<^sub>d = val_map rew'\<^sub>m\<^sub>i\<^sub>r + val_map unregistered"
           using val_map_split by (metis add.commute)
-        finally show ?thesis
-          using * by simp
+        ultimately show ?thesis
+          by simp
       qed
       then show ?thesis
         by simp
   qed
     finally show ?thesis .
   qed
-  moreover have "val_epoch_state s =
+  moreover have "val_epoch_state s\<^sub>2 =
     treasury + reserves + val_utxo utxo + deps + fees + val_map rewards"
-    using f1 by simp
+    using f2 by simp
   ultimately show ?thesis
     by simp
 qed
@@ -1097,17 +1103,17 @@ lemma newepoch_value_preservation:
 proof -
   from assms show ?thesis
   proof cases
-    case (new_epoch e\<^sub>l ru ru' b\<^sub>p\<^sub>r\<^sub>e\<^sub>v es es' pd' osched' b\<^sub>c\<^sub>u\<^sub>r pd osched)
-    have "val_epoch_state es' = val_epoch_state es"
+    case (new_epoch e\<^sub>l ru ru' _ _ _ _ i\<^sub>r\<^sub>w\<^sub>d' es b\<^sub>p\<^sub>r\<^sub>e\<^sub>v es' es'' pd' osched' b\<^sub>c\<^sub>u\<^sub>r pd osched)
+    have "val_epoch_state es'' = val_epoch_state es"
     proof -
       from \<open>inj addr_rwd\<close> and \<open>mono addr_rwd\<close> and \<open>ru' = create_r_upd b\<^sub>p\<^sub>r\<^sub>e\<^sub>v es\<close> have "
         val_epoch_state (apply_r_upd ru' es) = val_epoch_state es"
         using reward_update_value_preservation by presburger
-      with \<open>\<turnstile> apply_r_upd ru' es \<rightarrow>\<^bsub>EPOCH\<^esub>{\<epsilon>} es'\<close> show ?thesis
+      with \<open>es' = apply_r_upd ru' es\<close> and \<open>\<turnstile> es' \<rightarrow>\<^bsub>EPOCH\<^esub>{\<epsilon>} es''\<close> show ?thesis
         using epoch_value_preservation by simp
     qed
     with \<open>s = (e\<^sub>l, b\<^sub>p\<^sub>r\<^sub>e\<^sub>v, b\<^sub>c\<^sub>u\<^sub>r, es, ru, pd, osched)\<close> and
-      \<open>s' = (\<epsilon>, b\<^sub>c\<^sub>u\<^sub>r, {$$}, es', None, pd', osched')\<close> show ?thesis
+      \<open>s' = (\<epsilon>, b\<^sub>c\<^sub>u\<^sub>r, {$$}, es'', None, pd', osched')\<close> show ?thesis
       by simp
   next
     case not_new_epoch
@@ -1161,6 +1167,7 @@ qed
 fun val_chain_state :: "chain_state \<Rightarrow> coin" where
   "val_chain_state s = val_new_epoch_state (fst s)"
 
+\<comment> \<open>NOTE: Theorem 15.2 in the spec.\<close>
 theorem chain_value_preservation:
   assumes "e \<turnstile> s \<rightarrow>\<^bsub>CHAIN\<^esub>{block} s'"
   and "inj addr_rwd"

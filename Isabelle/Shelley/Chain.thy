@@ -88,11 +88,14 @@ inductive new_epoch_sts :: "new_epoch_env \<Rightarrow> new_epoch_state \<Righta
   where
     new_epoch: "
       \<Gamma> \<turnstile>
-        (e\<^sub>l, b\<^sub>p\<^sub>r\<^sub>e\<^sub>v, b\<^sub>c\<^sub>u\<^sub>r, es, ru, pd, osched) \<rightarrow>\<^bsub>NEWEPOCH\<^esub>{e} (e, b\<^sub>c\<^sub>u\<^sub>r, {$$}, es', None, pd', osched')"
+        (e\<^sub>l, b\<^sub>p\<^sub>r\<^sub>e\<^sub>v, b\<^sub>c\<^sub>u\<^sub>r, es, ru, pd, osched) \<rightarrow>\<^bsub>NEWEPOCH\<^esub>{e} (e, b\<^sub>c\<^sub>u\<^sub>r, {$$}, es'', None, pd', osched')"
       if "e = e\<^sub>l + 1"
       and "ru = Some ru'"
+      and "(_, _, _, _, i\<^sub>r\<^sub>w\<^sub>d') = ru'"
+      and "i\<^sub>r\<^sub>w\<^sub>d' = get_ir es"
       and "ru' = create_r_upd b\<^sub>p\<^sub>r\<^sub>e\<^sub>v es"
-      and "\<turnstile> apply_r_upd ru' es \<rightarrow>\<^bsub>EPOCH\<^esub>{e} es'"
+      and "es' = apply_r_upd ru' es"
+      and "\<turnstile> es' \<rightarrow>\<^bsub>EPOCH\<^esub>{e} es''"
       and "pd' = undefined"
       and "osched' = undefined"
   | not_new_epoch: "
