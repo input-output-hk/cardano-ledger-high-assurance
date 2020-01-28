@@ -205,6 +205,9 @@ text \<open> Accessor Functions \<close>
 fun get_ir :: "epoch_state \<Rightarrow> (credential, coin) fmap" where
  "get_ir (_, _, (_, ((_, _, i\<^sub>r\<^sub>w\<^sub>d), _)), _) = i\<^sub>r\<^sub>w\<^sub>d"
 
+fun get_fee_ss :: "epoch_state \<Rightarrow> coin" where
+ "get_fee_ss (_, (_, _, _, _, fee_ss), _, _) = fee_ss"
+
 text \<open> Epoch Inference Rule \<close>
 
 inductive epoch_sts :: "epoch_state \<Rightarrow> epoch \<Rightarrow> epoch_state \<Rightarrow> bool"
