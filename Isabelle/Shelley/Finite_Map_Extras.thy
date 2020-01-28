@@ -352,20 +352,76 @@ qed
 
 text \<open> Map difference \<close>
 
+lemma fsubset_antisym:
+  assumes "m \<subseteq>\<^sub>f n"
+  and "n \<subseteq>\<^sub>f m"
+  shows "m = n"
+proof -
+  from \<open>m \<subseteq>\<^sub>f n\<close> have "\<forall>k \<in> dom (($$) m). (($$) m) k = (($$) n) k"
+    by (simp add: fmsubset.rep_eq map_le_def)
+  moreover from \<open>n \<subseteq>\<^sub>f m\<close> have "\<forall>k \<in> dom (($$) n). (($$) n) k = (($$) m) k"
+    by (simp add: fmsubset.rep_eq map_le_def)
+  ultimately show ?thesis
+  proof (intro fmap_ext)
+    fix k
+    consider
+      (a) "k \<in> dom (($$) m)" |
+      (b) "k \<in> dom (($$) n)" |
+      (c) "k \<notin> dom (($$) m) \<and> k \<notin> dom (($$) n)"
+      by auto
+    then show "m $$ k = n $$ k"
+    proof cases
+      case a
+      with \<open>\<forall>k \<in> dom (($$) m). m $$ k = n $$ k\<close> show ?thesis
+        by simp
+    next
+      case b
+      with \<open>\<forall>k \<in> dom (($$) n). n $$ k = m $$ k\<close> show ?thesis
+        by simp
+    next
+      case c
+      then show ?thesis
+        by (simp add: fmdom'_notD)
+    qed
+  qed
+qed
+
 abbreviation
   fmdiff :: "('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap \<Rightarrow> ('a, 'b) fmap" (infixl \<open>--\<^sub>f\<close> 100) where
   "m\<^sub>1 --\<^sub>f m\<^sub>2 \<equiv> fmfilter (\<lambda>x. x \<notin> fmdom' m\<^sub>2) m\<^sub>1"
 
-lemma fmdiff_partition: (* TODO: Find a nicer proof *)
+lemma fmdiff_partition:
   assumes "m\<^sub>2 \<subseteq>\<^sub>f m\<^sub>1"
   shows "m\<^sub>2 ++\<^sub>f (m\<^sub>1 --\<^sub>f m\<^sub>2) = m\<^sub>1"
 proof -
-  from assms have *: "m\<^sub>2 ++\<^sub>f (m\<^sub>1 --\<^sub>f m\<^sub>2) \<subseteq>\<^sub>f m\<^sub>1"
-    by (smt fmfilter_subset fmlookup_add fmpred_iff fmsubset_alt_def)
+  have *: "m\<^sub>2 ++\<^sub>f (m\<^sub>1 --\<^sub>f m\<^sub>2) \<subseteq>\<^sub>f m\<^sub>1"
+  proof -
+    have "\<forall>k v. (m\<^sub>2 ++\<^sub>f (m\<^sub>1 --\<^sub>f m\<^sub>2)) $$ k = Some v \<longrightarrow> m\<^sub>1 $$ k = Some v"
+    proof (intro allI impI)
+      fix k v
+      assume "(m\<^sub>2 ++\<^sub>f (m\<^sub>1 --\<^sub>f m\<^sub>2)) $$ k = Some v"
+      then have **: "(if k |\<in>| fmdom (m\<^sub>1 --\<^sub>f m\<^sub>2) then (m\<^sub>1 --\<^sub>f m\<^sub>2) $$ k else m\<^sub>2 $$ k) = Some v"
+        by simp
+      then show "m\<^sub>1 $$ k = Some v"
+      proof (cases "k |\<in>| fmdom (m\<^sub>1 --\<^sub>f m\<^sub>2)")
+        case True
+        with ** show ?thesis
+          by simp
+      next
+        case False
+        with \<open>m\<^sub>2 \<subseteq>\<^sub>f m\<^sub>1\<close> show ?thesis
+          by simp
+      qed
+    qed
+    then have "fmpred (\<lambda>k v. m\<^sub>1 $$ k = Some v) (m\<^sub>2 ++\<^sub>f (m\<^sub>1 --\<^sub>f m\<^sub>2))"
+      by (blast intro: fmpred_iff)
+    then show ?thesis
+      by (auto simp add: fmsubset_alt_def)
+  qed
   then have "m\<^sub>1 \<subseteq>\<^sub>f m\<^sub>2 ++\<^sub>f (m\<^sub>1 --\<^sub>f m\<^sub>2)"
     by (simp add: fmsubset.rep_eq map_le_def)
   with * show ?thesis
-    by (metis (no_types, lifting) domIff fmap_ext fmsubset.rep_eq map_le_def)
+    by (simp add: fsubset_antisym)
 qed
 
 lemma fmdiff_fmupd: (* TODO: Find a nicer proof *)
