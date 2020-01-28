@@ -102,11 +102,25 @@ next
   qed
 qed
 
-lemma fmran_singleton: "fmran {k $$:= v} = {|v|}" (* TODO: Find a nicer proof *)
+lemma fmran_singleton: "fmran {k $$:= v} = {|v|}"
 proof -
-  have "\<And>v'. v' |\<in>| fmran {k $$:= v} \<Longrightarrow> v' = v"
-    by (metis fmdom_empty fmdom_fmupd fmdom_notD fmranE fmupd_lookup fsingleton_iff
-        option.distinct(1) option.sel)
+  have "v' |\<in>| fmran {k $$:= v} \<Longrightarrow> v' = v" for v'
+  proof -
+    assume "v' |\<in>| fmran {k $$:= v}"
+    fix k'
+    have "fmdom' {k $$:= v} = {k}"
+      by simp
+    then show "v' = v"
+    proof (cases "k' = k")
+      case True
+      with \<open>v' |\<in>| fmran {k $$:= v}\<close> show ?thesis
+        using fmdom'I by fastforce
+    next
+      case False
+      with \<open>fmdom' {k $$:= v} = {k}\<close> and \<open>v' |\<in>| fmran {k $$:= v}\<close> show ?thesis
+        using fmdom'I by fastforce
+    qed
+  qed
   moreover have "v |\<in>| fmran {k $$:= v}"
     by (simp add: fmranI)
   ultimately show ?thesis
