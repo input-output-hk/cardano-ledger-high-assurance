@@ -424,12 +424,26 @@ proof -
     by (simp add: fsubset_antisym)
 qed
 
-lemma fmdiff_fmupd: (* TODO: Find a nicer proof *)
+lemma fmdiff_fmupd:
   assumes "m $$ k = None"
   shows "m(k $$:= v) --\<^sub>f {k $$:= v} = m"
-  using assms
-  by (smt Diff_iff Diff_insert_absorb fmdom'_empty fmdom'_fmupd fmdom'_notD fmdom'_notI
-      fmfilter_true fmfilter_upd option.simps(3) singletonI)
+proof -
+  let ?P = "(\<lambda>k'. k' \<notin> {k})"
+  have "m(k $$:= v) --\<^sub>f {k $$:= v} = fmfilter (\<lambda>x. x \<notin> fmdom' {k $$:= v}) m(k $$:= v)" ..
+  also have "\<dots> = fmfilter ?P m(k $$:= v)"
+    by simp
+  also have "\<dots> = (if ?P k then (fmfilter ?P m)(k $$:= v) else fmfilter ?P m)"
+    by simp
+  also have "\<dots> = fmfilter ?P m"
+    by simp
+  finally show ?thesis
+  proof -
+    from \<open>m $$ k = None\<close> have "\<And>k' v'. m $$ k' = Some v' \<Longrightarrow> ?P k'"
+      by fastforce
+    then show ?thesis
+      by simp
+  qed
+qed
 
 text \<open> Map symmetric difference \<close>
 
