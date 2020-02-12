@@ -409,8 +409,8 @@ proof -
           by simp
       next
         case False
-        with \<open>m\<^sub>2 \<subseteq>\<^sub>f m\<^sub>1\<close> show ?thesis
-          by simp
+        with ** and \<open>m\<^sub>2 \<subseteq>\<^sub>f m\<^sub>1\<close> show ?thesis
+          by (metis (mono_tags, lifting) fmpredD fmsubset_alt_def)
       qed
     qed
     then have "fmpred (\<lambda>k v. m\<^sub>1 $$ k = Some v) (m\<^sub>2 ++\<^sub>f (m\<^sub>1 --\<^sub>f m\<^sub>2))"
