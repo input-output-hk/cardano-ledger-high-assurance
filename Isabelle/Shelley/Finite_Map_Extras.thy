@@ -601,6 +601,22 @@ proof -
     using \<open>m\<^sub>2 $$ k = Some v'\<close> and dom_res_singleton by fastforce
 qed
 
+lemma dom_res_addition_not_in:
+  assumes "m\<^sub>2 $$ k = None"
+  shows "fmdom' m\<^sub>1(k $$:= v) \<lhd> m\<^sub>2 = fmdom' m\<^sub>1 \<lhd> m\<^sub>2"
+proof -
+  have "fmdom' m\<^sub>1(k $$:= v) \<lhd> m\<^sub>2 = fmfilter (\<lambda>k'. k' = k \<or> k' \<in> fmdom' m\<^sub>1) m\<^sub>2"
+    by simp
+  also have "\<dots> = fmdom' m\<^sub>1 \<lhd> m\<^sub>2"
+  proof (intro fmfilter_cong')
+    show "m\<^sub>2 = m\<^sub>2" ..
+  next
+    from assms show "k' \<in> fmdom' m\<^sub>2 \<Longrightarrow> (k' = k \<or> k' \<in> fmdom' m\<^sub>1) = (k' \<in> fmdom' m\<^sub>1)" for k'
+    by (cases "k' = k") (simp_all add: fmdom'_notI)
+  qed
+  finally show ?thesis .
+qed
+
 lemma inter_plus_addition_in:
   assumes "m\<^sub>1 $$ k = None"
   and "m\<^sub>2 $$ k = Some v'"
@@ -621,14 +637,14 @@ proof -
   proof -
     have "fmmap_keys ?f {k $$:= v'} = {k $$:= v' + v}"
     proof (intro fmap_ext)
-      fix x
-      have "fmmap_keys ?f {k $$:= v'} $$ x = map_option (?f x) ({k $$:= v'} $$ x)"
+      fix k'
+      have "fmmap_keys ?f {k $$:= v'} $$ k' = map_option (?f k') ({k $$:= v'} $$ k')"
         using fmlookup_fmmap_keys .
-      also have "\<dots> = map_option (?f x) (if k = x then Some v' else {$$} $$ x)"
+      also have "\<dots> = map_option (?f k') (if k = k' then Some v' else {$$} $$ k')"
         by simp
-      also have "\<dots> = {k $$:= v' + v} $$ x"
-        by (cases "x = k") simp_all
-      finally show "fmmap_keys ?f {k $$:= v'} $$ x = {k $$:= v' + v} $$ x" .
+      also have "\<dots> = {k $$:= v' + v} $$ k'"
+        by (cases "k' = k") simp_all
+      finally show "fmmap_keys ?f {k $$:= v'} $$ k' = {k $$:= v' + v} $$ k'" .
     qed
     then show ?thesis
       by simp
@@ -638,22 +654,24 @@ proof -
   finally show ?thesis .
 qed
 
-lemma inter_plus_addition_notin: (* TODO: Find nicer proofs for SMT calls. *)
+lemma inter_plus_addition_notin:
   assumes "m\<^sub>1 $$ k = None"
   and "m\<^sub>2 $$ k = None"
   shows "m\<^sub>1(k $$:= v) \<inter>\<^sub>+ m\<^sub>2 = (m\<^sub>1 \<inter>\<^sub>+ m\<^sub>2)"
 proof -
+  let ?f = "\<lambda>k' v'. v' + m\<^sub>1(k $$:= v) $$! k'"
   from \<open>m\<^sub>2 $$ k = None\<close>
-  have "m\<^sub>1(k $$:= v) \<inter>\<^sub>+ m\<^sub>2 = fmmap_keys (\<lambda>k' v'. v' + m\<^sub>1(k $$:= v) $$! k') (fmdom' m\<^sub>1 \<lhd> m\<^sub>2)"
-    by (smt fmdom'_fmupd fmdom'_notI fmfilter_cong' insert_iff)
+  have "m\<^sub>1(k $$:= v) \<inter>\<^sub>+ m\<^sub>2 = fmmap_keys ?f (fmdom' m\<^sub>1 \<lhd> m\<^sub>2)"
+    using dom_res_addition_not_in by metis
   also have "\<dots> = fmmap_keys (\<lambda>k' v'. v' + m\<^sub>1 $$! k') (fmdom' m\<^sub>1 \<lhd> m\<^sub>2)"
   proof (intro fmap_ext)
     fix k'
-    from \<open>m\<^sub>1 $$ k = None\<close>
-    show "fmmap_keys (\<lambda>k' v'. v' + m\<^sub>1(k $$:= v) $$! k') (fmdom' m\<^sub>1 \<lhd> m\<^sub>2) $$ k' =
-      fmmap_keys (\<lambda>k' v'. v' + m\<^sub>1 $$! k') (fmdom' m\<^sub>1 \<lhd> m\<^sub>2) $$ k'"
-      by (smt domIff dom_fmlookup fmdiff_fmupd fmlookup_filter fmlookup_fmmap_keys
-          map_option_is_None option.expand option.map_sel)
+    have "fmmap_keys ?f (fmdom' m\<^sub>1 \<lhd> m\<^sub>2) $$ k' = map_option (?f k') ((fmdom' m\<^sub>1 \<lhd> m\<^sub>2) $$ k')"
+      using fmlookup_fmmap_keys .
+    also from \<open>m\<^sub>1 $$ k = None\<close> have "\<dots> = fmmap_keys (\<lambda>k' v'. v' + m\<^sub>1 $$! k') (fmdom' m\<^sub>1 \<lhd> m\<^sub>2) $$ k'"
+      by (cases "k' = k") (simp_all add: fmdom'_notI)
+    finally show "fmmap_keys ?f (fmdom' m\<^sub>1 \<lhd> m\<^sub>2) $$ k' =
+      fmmap_keys (\<lambda>k' v'. v' + m\<^sub>1 $$! k') (fmdom' m\<^sub>1 \<lhd> m\<^sub>2) $$ k'" .
   qed
   finally show ?thesis .
 qed
