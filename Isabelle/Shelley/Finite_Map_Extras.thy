@@ -601,16 +601,15 @@ proof -
     using \<open>m\<^sub>2 $$ k = Some v'\<close> and dom_res_singleton by fastforce
 qed
 
-lemma inter_plus_addition_in: (* TODO: Find nicer proofs for SMT calls. *)
+lemma inter_plus_addition_in:
   assumes "m\<^sub>1 $$ k = None"
   and "m\<^sub>2 $$ k = Some v'"
   shows "m\<^sub>1(k $$:= v) \<inter>\<^sub>+ m\<^sub>2 = (m\<^sub>1 \<inter>\<^sub>+ m\<^sub>2) ++\<^sub>f {k $$:= v' + v}"
 proof -
-  from assms have "m\<^sub>1(k $$:= v) \<inter>\<^sub>+ m\<^sub>2 =
-    fmmap_keys (\<lambda>k' v'. v' + m\<^sub>1(k $$:= v) $$! k') ((fmdom' m\<^sub>1 \<lhd> m\<^sub>2) ++\<^sub>f {k $$:= v'})"
+  let ?f = "\<lambda>k' v'. v' + m\<^sub>1(k $$:= v) $$! k'"
+  from assms have "m\<^sub>1(k $$:= v) \<inter>\<^sub>+ m\<^sub>2 = fmmap_keys ?f ((fmdom' m\<^sub>1 \<lhd> m\<^sub>2) ++\<^sub>f {k $$:= v'})"
     using dom_res_addition_in by fastforce
-  also have "\<dots> = fmmap_keys (\<lambda>k' v'. v' + m\<^sub>1(k $$:= v) $$! k') (fmdom' m\<^sub>1 \<lhd> m\<^sub>2)
-    ++\<^sub>f fmmap_keys (\<lambda>k' v'. v' + m\<^sub>1(k $$:= v) $$! k') {k $$:= v'}"
+  also have "\<dots> = fmmap_keys ?f (fmdom' m\<^sub>1 \<lhd> m\<^sub>2) ++\<^sub>f fmmap_keys ?f {k $$:= v'}"
   proof -
     from \<open>m\<^sub>1 $$ k = None\<close> have "fmdom' (fmdom' m\<^sub>1 \<lhd> m\<^sub>2) \<inter> fmdom' {k $$:= v'} = {}"
       by (simp add: fmdom'_notI)
@@ -618,9 +617,22 @@ proof -
       using fmmap_keys_hom by blast
   qed
   also from assms
-  have "\<dots> = fmmap_keys (\<lambda>k' v'. v' + m\<^sub>1(k $$:= v) $$! k') (fmdom' m\<^sub>1 \<lhd> m\<^sub>2) ++\<^sub>f {k $$:= v' + v}"
-    using dom_res_singleton by (smt domIff dom_fmlookup fmfilter_fmmap_keys fmlookup_dom'_iff
-      fmlookup_fmmap_keys fmupd_lookup map_option_is_None option.map_sel option.sel)
+  have "\<dots> = fmmap_keys ?f (fmdom' m\<^sub>1 \<lhd> m\<^sub>2) ++\<^sub>f {k $$:= v' + v}"
+  proof -
+    have "fmmap_keys ?f {k $$:= v'} = {k $$:= v' + v}"
+    proof (intro fmap_ext)
+      fix x
+      have "fmmap_keys ?f {k $$:= v'} $$ x = map_option (?f x) ({k $$:= v'} $$ x)"
+        using fmlookup_fmmap_keys .
+      also have "\<dots> = map_option (?f x) (if k = x then Some v' else {$$} $$ x)"
+        by simp
+      also have "\<dots> = {k $$:= v' + v} $$ x"
+        by (cases "x = k") simp_all
+      finally show "fmmap_keys ?f {k $$:= v'} $$ x = {k $$:= v' + v} $$ x" .
+    qed
+    then show ?thesis
+      by simp
+  qed
   also have "\<dots> = fmmap_keys (\<lambda>k' v'. v' + m\<^sub>1 $$! k') (fmdom' m\<^sub>1 \<lhd> m\<^sub>2) ++\<^sub>f {k $$:= v' + v}"
     by (simp add: fmap_ext)
   finally show ?thesis .
