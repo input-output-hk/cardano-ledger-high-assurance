@@ -200,14 +200,6 @@ text \<open> Epoch States \<close>
 
 type_synonym epoch_state = "acnt \<times> snapshots \<times> l_state \<times> p_params"
 
-text \<open> Accessor Functions \<close>
-
-fun get_ir :: "epoch_state \<Rightarrow> (credential, coin) fmap" where
- "get_ir (_, _, (_, ((_, _, i\<^sub>r\<^sub>w\<^sub>d), _)), _) = i\<^sub>r\<^sub>w\<^sub>d"
-
-fun get_fee_ss :: "epoch_state \<Rightarrow> coin" where
- "get_fee_ss (_, (_, _, _, _, fee_ss), _, _) = fee_ss"
-
 text \<open> Epoch Inference Rule \<close>
 
 inductive epoch_sts :: "epoch_state \<Rightarrow> epoch \<Rightarrow> epoch_state \<Rightarrow> bool"
@@ -235,7 +227,7 @@ subsection \<open> Reward Update Calculation \<close>
 
 text \<open> Reward Update \<close>
 
-type_synonym reward_update = "coin \<times> coin \<times> (addr_rwd, coin) fmap \<times> coin \<times> (credential, coin) fmap"
+type_synonym reward_update = "coin \<times> coin \<times> (addr_rwd, coin) fmap \<times> coin"
 
 text \<open> Calculation to create a reward update \<close>
 
@@ -244,31 +236,28 @@ fun create_r_upd :: "blocks_made \<Rightarrow> epoch_state \<Rightarrow> reward_
     (
       (_, reserves),
       (_, _, (stake, delegs), pools_ss, fee_ss),
-      (_, ((_, rewards, i\<^sub>r\<^sub>w\<^sub>d), _)),
+      (_, ((_, rewards, _), _)),
       pp
     ) =
     (
       let
-        rewards\<^sub>m\<^sub>i\<^sub>r = (\<Sum> k \<in> fmdom' i\<^sub>r\<^sub>w\<^sub>d. i\<^sub>r\<^sub>w\<^sub>d $$! k);
-        reserves' = reserves - rewards\<^sub>m\<^sub>i\<^sub>r;
         blocks_made = (\<Sum> k \<in> fmdom' b. b $$! k);
         \<eta> = real blocks_made / (real slots_per_epoch * active_slot_coeff pp);
-        \<Delta>r\<^sub>l = \<lfloor>min 1 \<eta> * rho pp * reserves'\<rfloor>;
-        reward_pot = fee_ss + \<Delta>r\<^sub>l;
+        \<Delta>r = \<lfloor>min 1 \<eta> * rho pp * reserves\<rfloor>;
+        reward_pot = fee_ss + \<Delta>r;
         \<Delta>t\<^sub>1 = \<lfloor>tau pp * reward_pot\<rfloor>;
-        \<Delta>r = \<Delta>r\<^sub>l + rewards\<^sub>m\<^sub>i\<^sub>r;
         R = reward_pot - \<Delta>t\<^sub>1;
         rs = reward pp b R (fmdom' rewards) pools_ss stake delegs;
         \<Delta>t\<^sub>2 = R - (\<Sum> k \<in> fmdom' rs. rs $$! k)
       in
-        (\<Delta>t\<^sub>1 + \<Delta>t\<^sub>2, -\<Delta>r, rs, -fee_ss, i\<^sub>r\<^sub>w\<^sub>d)
+        (\<Delta>t\<^sub>1 + \<Delta>t\<^sub>2, -\<Delta>r, rs, -fee_ss)
     )"
 
 text \<open> Applying a reward update \<close>
 
 fun apply_r_upd :: "reward_update \<Rightarrow> epoch_state \<Rightarrow> epoch_state" where
   "apply_r_upd
-    (\<Delta>t, \<Delta>r, rs, \<Delta>f, i'\<^sub>r\<^sub>w\<^sub>d)
+    (\<Delta>t, \<Delta>r, rs, \<Delta>f)
     (
       (treasury, reserves),
       ss,
@@ -279,21 +268,13 @@ fun apply_r_upd :: "reward_update \<Rightarrow> epoch_state \<Rightarrow> epoch_
       ppm
     ) =
     (
-      let
-        rew'\<^sub>m\<^sub>i\<^sub>r = fmdom' stk_creds \<lhd> i'\<^sub>r\<^sub>w\<^sub>d;
-        unregistered = fmdom' stk_creds \<lhd>/ i'\<^sub>r\<^sub>w\<^sub>d;
-        non_distributed = (\<Sum>k \<in> fmdom' unregistered. unregistered $$! k);
-        update\<^sub>r\<^sub>w\<^sub>d = fmap_of_list [(addr_rwd hk, val). (hk, val) \<leftarrow> sorted_list_of_fmap rew'\<^sub>m\<^sub>i\<^sub>r]
-      in
-        (
-          (treasury + \<Delta>t, reserves + \<Delta>r + non_distributed),
-          ss,
-          (
-            (utxo, deps, fees + \<Delta>f, up),
-            ((stk_creds, (rewards \<union>\<^sub>+ rs) \<union>\<^sub>+ update\<^sub>r\<^sub>w\<^sub>d, {$$}), pstate)
-          ),
-          ppm
-        )
+      (treasury + \<Delta>t, reserves + \<Delta>r),
+      ss,
+      (
+        (utxo, deps, fees + \<Delta>f, up),
+        ((stk_creds, rewards \<union>\<^sub>+ rs, i\<^sub>r\<^sub>w\<^sub>d), pstate)
+      ),
+      ppm
     )"
 
 end

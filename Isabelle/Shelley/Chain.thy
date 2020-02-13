@@ -57,6 +57,30 @@ consts h_b_bsize :: "b_h_body \<Rightarrow> nat" \<comment> \<open>NOTE: Abstrac
 
 consts bbodyhash :: "tx list \<Rightarrow> hash_b_body"
 
+subsection \<open> MIR Transition \<close>
+
+inductive mir_sts :: "epoch_state \<Rightarrow> epoch_state \<Rightarrow> bool"
+  (\<open>\<turnstile> _ \<rightarrow>\<^bsub>MIR\<^esub> _\<close> [0, 50])
+  where
+    mir: "
+      \<turnstile> (acnt, ss, (us, (ds, ps)), pp) \<rightarrow>\<^bsub>MIR\<^esub> (acnt', ss, (us, (ds', ps)), pp)"
+      if "(stk_creds, rewards, i\<^sub>r\<^sub>w\<^sub>d) = ds"
+      and "(treasury, reserves) = acnt"
+      and "i'\<^sub>r\<^sub>w\<^sub>d = fmdom' stk_creds \<lhd> i\<^sub>r\<^sub>w\<^sub>d"
+      and "tot = (\<Sum> k \<in> fmdom' i'\<^sub>r\<^sub>w\<^sub>d. i'\<^sub>r\<^sub>w\<^sub>d $$! k)"
+      and "update = fmap_of_list [(addr_rwd hk, val). (hk, val) \<leftarrow> sorted_list_of_fmap i'\<^sub>r\<^sub>w\<^sub>d]"
+      and "tot \<le> reserves"
+      and "acnt' = (treasury, reserves - tot)"
+      and "ds' = (stk_creds, rewards \<union>\<^sub>+ update, {$$})"
+  | mir_skip: "
+      \<turnstile> (acnt, ss, (us, (ds, ps)), pp) \<rightarrow>\<^bsub>MIR\<^esub> (acnt, ss, (us, (ds', ps)), pp)"
+      if "(stk_creds, rewards, i\<^sub>r\<^sub>w\<^sub>d) = ds"
+      and "(_, reserves) = acnt"
+      and "i'\<^sub>r\<^sub>w\<^sub>d = fmdom' stk_creds \<lhd> i\<^sub>r\<^sub>w\<^sub>d"
+      and "tot = (\<Sum> k \<in> fmdom' i'\<^sub>r\<^sub>w\<^sub>d. i'\<^sub>r\<^sub>w\<^sub>d $$! k)"
+      and "tot > reserves"
+      and "ds' = (stk_creds, rewards, {$$})"
+
 subsection \<open> New Epoch Transition \<close>
 
 text \<open> New Epoch environments \<close>
@@ -88,17 +112,14 @@ inductive new_epoch_sts :: "new_epoch_env \<Rightarrow> new_epoch_state \<Righta
   where
     new_epoch: "
       \<Gamma> \<turnstile>
-        (e\<^sub>l, b\<^sub>p\<^sub>r\<^sub>e\<^sub>v, b\<^sub>c\<^sub>u\<^sub>r, es, ru, pd, osched) \<rightarrow>\<^bsub>NEWEPOCH\<^esub>{e} (e, b\<^sub>c\<^sub>u\<^sub>r, {$$}, es'', None, pd', osched')"
+        (e\<^sub>l, b\<^sub>p\<^sub>r\<^sub>e\<^sub>v, b\<^sub>c\<^sub>u\<^sub>r, es, ru, pd, osched) \<rightarrow>\<^bsub>NEWEPOCH\<^esub>{e} (e, b\<^sub>c\<^sub>u\<^sub>r, {$$}, es''', None, pd', osched')"
       if "e = e\<^sub>l + 1"
       and "ru = Some ru'"
-      and "(\<Delta>t, \<Delta>r, rs, \<Delta>f, i\<^sub>r\<^sub>w\<^sub>d) = ru'"
-      and "i\<^sub>r\<^sub>w\<^sub>d = get_ir es"
-      and "\<Delta>f = - get_fee_ss es"
-      and "rewards\<^sub>m\<^sub>i\<^sub>r = (\<Sum> k \<in> fmdom' i\<^sub>r\<^sub>w\<^sub>d. i\<^sub>r\<^sub>w\<^sub>d $$! k)"
-      and "- \<Delta>r = \<Delta>r\<^sub>l + rewards\<^sub>m\<^sub>i\<^sub>r"
-      and "\<Delta>t - \<Delta>r\<^sub>l + (\<Sum> k \<in> fmdom' rs. rs $$! k) + \<Delta>f = 0"
+      and "(\<Delta>t, \<Delta>r, rs, \<Delta>f) = ru'"
+      and "\<Delta>t + \<Delta>r + (\<Sum> k \<in> fmdom' rs. rs $$! k) + \<Delta>f = 0"
       and "es' = apply_r_upd ru' es"
-      and "\<turnstile> es' \<rightarrow>\<^bsub>EPOCH\<^esub>{e} es''"
+      and "\<turnstile> es' \<rightarrow>\<^bsub>MIR\<^esub> es''"
+      and "\<turnstile> es'' \<rightarrow>\<^bsub>EPOCH\<^esub>{e} es'''"
       and "pd' = undefined"
       and "osched' = undefined"
   | not_new_epoch: "
