@@ -1,0 +1,23 @@
+chapter LedgerFormalization
+
+session Shelley (ledgerformalization) = HOL +
+  description \<open>Shelley Release\<close>
+  sessions
+    "HOL-Library"
+  theories
+    Finite_Map_Extras
+    Basic_Types
+    Cryptography
+    Address
+    Protocol_Parameters
+    Transaction
+    Update
+    UTxO
+    Delegation_Certificates
+    Delegation
+    Ledger
+    Rewards
+    Chain
+    Properties
+  document_files
+    "root.tex"
